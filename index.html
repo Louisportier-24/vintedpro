@@ -766,7 +766,6 @@ textarea.form-input { resize: vertical; min-height: 80px; line-height: 1.5; }
 
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
 
 // ═══════════════════════════════
 // FAKE USER DATABASE (demo)
@@ -1241,13 +1240,13 @@ function fmtDate(d) {
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ─── Branchement des événements ───────────────────────────────
-document.getElementById('login-btn').addEventListener('click', doLogin);
-document.getElementById('login-password').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
+// ─── Init ───────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('login-btn').addEventListener('click', doLogin);
+  document.getElementById('login-password').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
 });
-
-}); // fin DOMContentLoaded
 </script>
 </body>
 </html>
