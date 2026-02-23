@@ -915,86 +915,46 @@ function renderKPISkeleton() {
 }
 
 // ═══════════════════════════════
-// DATA — MODE DÉMO (données simulées)
-// Remplacez fetchNotionData() par la version Notion réelle
-// une fois le proxy Cloudflare Worker déployé.
+// NOTION DATA FETCH
 // ═══════════════════════════════
 async function fetchNotionData() {
-  await sleep(1200); // simulation du temps de chargement
+  const key = currentUser.notionKey;
+  const dbName = currentUser.notionDbName;
 
-  document.getElementById('table-title').textContent = 'BDD Montres';
+  // 1 — Recherche de la base
+  const searchRes = await notionFetch('/search', 'POST', key, {
+    query: dbName,
+    filter: { value: 'database', property: 'object' },
+  });
+  if (!searchRes.results || !searchRes.results.length) {
+    throw new Error('Base de données introuvable. Vérifiez les accès de l\'intégration.');
+  }
+  const db = searchRes.results[0];
+  state.properties = db.properties;
 
-  // Colonnes simulées (structure identique à Notion)
-  state.properties = {
-    'Nom'         : { type: 'title' },
-    'Marque'      : { type: 'select' },
-    'Référence'   : { type: 'rich_text' },
-    'Prix achat'  : { type: 'number' },
-    'Prix vente'  : { type: 'number' },
-    'Statut'      : { type: 'select' },
-    'Acheteur'    : { type: 'rich_text' },
-    'Date vente'  : { type: 'date' },
-    'Lien annonce': { type: 'url' },
-    'Notes'       : { type: 'rich_text' },
-  };
+  // 2 — Chargement des entrées
+  let rows = [], cursor;
+  do {
+    const body = { page_size: 100 };
+    if (cursor) body.start_cursor = cursor;
+    const res = await notionFetch('/databases/' + db.id + '/query', 'POST', key, body);
+    rows = rows.concat(res.results);
+    cursor = res.has_more ? res.next_cursor : null;
+  } while (cursor);
 
-  const montres = [
-    { nom:'Seiko SKX007', marque:'Seiko', ref:'SKX007K2', achat:180, vente:265, statut:{n:'Vendu',c:'green'}, acheteur:'Thomas B.', date:'2026-02-18', lien:'https://vinted.fr', notes:'Bracelet en bon état' },
-    { nom:'Casio G-Shock DW-5600', marque:'Casio', ref:'DW-5600E-1V', achat:55, vente:90, statut:{n:'Vendu',c:'green'}, acheteur:'Lucas D.', date:'2026-02-20', lien:'https://vinted.fr', notes:'Boîte originale incluse' },
-    { nom:'Tissot PR 100', marque:'Tissot', ref:'T101.410.11.031.00', achat:220, vente:310, statut:{n:'En ligne',c:'blue'}, acheteur:'', date:'', lien:'https://vinted.fr', notes:'' },
-    { nom:'Orient Bambino V2', marque:'Orient', ref:'FAC00004W0', achat:95, vente:155, statut:{n:'Réservé',c:'orange'}, acheteur:'Sophie M.', date:'', lien:'https://vinted.fr', notes:'Attente paiement' },
-    { nom:'Citizen Eco-Drive', marque:'Citizen', ref:'BM7360-82E', achat:130, vente:195, statut:{n:'Vendu',c:'green'}, acheteur:'Emma R.', date:'2026-02-10', lien:'https://vinted.fr', notes:'Bracelet cuir changé' },
-    { nom:'Seiko 5 SNKL23', marque:'Seiko', ref:'SNKL23K1', achat:70, vente:115, statut:{n:'En ligne',c:'blue'}, acheteur:'', date:'', lien:'https://vinted.fr', notes:'' },
-    { nom:'Hamilton Khaki Field', marque:'Hamilton', ref:'H70455133', achat:380, vente:520, statut:{n:'Vendu',c:'green'}, acheteur:'Paul V.', date:'2026-01-28', lien:'https://vinted.fr', notes:'Très bon état général' },
-    { nom:'Longines HydroConquest', marque:'Longines', ref:'L3.781.4.56.6', achat:650, vente:890, statut:{n:'En ligne',c:'blue'}, acheteur:'', date:'', lien:'https://vinted.fr', notes:'Papiers complets' },
-    { nom:'Casio Vintage A168W', marque:'Casio', ref:'A168WA-1YES', achat:18, vente:38, statut:{n:'Vendu',c:'green'}, acheteur:'Clara L.', date:'2026-02-05', lien:'https://vinted.fr', notes:'Iconique, vente rapide' },
-    { nom:'Bulova Precisionist', marque:'Bulova', ref:'98B229', achat:175, vente:240, statut:{n:'Invendu',c:'red'}, acheteur:'', date:'', lien:'https://vinted.fr', notes:'Prix à revoir' },
-    { nom:'Seiko Presage SRPB41', marque:'Seiko', ref:'SRPB41J1', achat:290, vente:420, statut:{n:'En ligne',c:'blue'}, acheteur:'', date:'', lien:'https://vinted.fr', notes:'Cadran nacre' },
-    { nom:'Omega De Ville', marque:'Omega', ref:'424.10.37.20.02.001', achat:1800, vente:2450, statut:{n:'Réservé',c:'orange'}, acheteur:'Marc F.', date:'', lien:'https://vinted.fr', notes:'Vintage 1998, beau cadran' },
-    { nom:'Tag Heuer Formula 1', marque:'Tag Heuer', ref:'WAZ1110.BA0875', achat:420, vente:580, statut:{n:'Vendu',c:'green'}, acheteur:'Julie T.', date:'2026-01-15', lien:'https://vinted.fr', notes:'' },
-    { nom:'Fossil Grant Chronograph', marque:'Fossil', ref:'FS4776', achat:45, vente:85, statut:{n:'Vendu',c:'green'}, acheteur:'Alex P.', date:'2026-02-01', lien:'https://vinted.fr', notes:'Pile neuve' },
-    { nom:'Certina DS Action', marque:'Certina', ref:'C032.407.11.051.00', achat:310, vente:430, statut:{n:'En ligne',c:'blue'}, acheteur:'', date:'', lien:'https://vinted.fr', notes:'200m waterproof' },
-    { nom:'Timex Expedition', marque:'Timex', ref:'TW4B14300', achat:25, vente:52, statut:{n:'Vendu',c:'green'}, acheteur:'Nina C.', date:'2026-02-14', lien:'https://vinted.fr', notes:'' },
-    { nom:'Rado HyperChrome', marque:'Rado', ref:'R32257152', achat:580, vente:820, statut:{n:'En ligne',c:'blue'}, acheteur:'', date:'', lien:'https://vinted.fr', notes:'Céramique mate' },
-    { nom:'Frederique Constant Slim', marque:'Frederique Constant', ref:'FC-245M5S6', achat:480, vente:650, statut:{n:'Vendu',c:'green'}, acheteur:'David M.', date:'2026-01-22', lien:'https://vinted.fr', notes:'Boîte et papiers' },
-    { nom:'Seiko Alpinist SARB017', marque:'Seiko', ref:'SARB017', achat:520, vente:780, statut:{n:'En ligne',c:'blue'}, acheteur:'', date:'', lien:'https://vinted.fr', notes:'Très recherché' },
-    { nom:'Swatch Big Bold', marque:'Swatch', ref:'SB03B100', achat:70, vente:95, statut:{n:'Invendu',c:'red'}, acheteur:'', date:'', lien:'https://vinted.fr', notes:'Couleur peu demandée' },
-  ];
-
-  // Transformer en format pseudo-Notion
-  state.allRows = montres.map((m, i) => ({
-    id: `row-${i}`,
-    properties: {
-      'Nom'         : { title: [{ plain_text: m.nom }] },
-      'Marque'      : { select: { name: m.marque, color: marqueColor(m.marque) } },
-      'Référence'   : { rich_text: [{ plain_text: m.ref }] },
-      'Prix achat'  : { number: m.achat },
-      'Prix vente'  : { number: m.vente },
-      'Statut'      : { select: { name: m.statut.n, color: m.statut.c } },
-      'Acheteur'    : { rich_text: m.acheteur ? [{ plain_text: m.acheteur }] : [] },
-      'Date vente'  : { date: m.date ? { start: m.date } : null },
-      'Lien annonce': { url: m.lien },
-      'Notes'       : { rich_text: m.notes ? [{ plain_text: m.notes }] : [] },
-    }
-  }));
-
-  state.filteredRows = [...state.allRows];
+  state.allRows = rows;
+  state.filteredRows = rows.slice();
   state.page = 0;
-}
 
-function marqueColor(m) {
-  const map = { 'Seiko':'blue','Casio':'gray','Tissot':'purple','Orient':'green',
-    'Citizen':'blue','Hamilton':'orange','Longines':'pink','Bulova':'brown',
-    'Omega':'yellow','Tag Heuer':'red','Fossil':'gray','Certina':'blue',
-    'Timex':'green','Rado':'purple','Frederique Constant':'orange','Swatch':'pink' };
-  return map[m] || 'default';
+  const name = db.title && db.title.length ? db.title.map(function(t) { return t.plain_text; }).join('') : 'Mes données';
+  document.getElementById('table-title').textContent = name;
 }
 
 // ─────────────────────────────────────────────────────────────
 // 👇 CONFIGUREZ ICI l'URL de votre Cloudflare Worker après déploiement
 // Ex: "https://notion-proxy.votre-compte.workers.dev"
 // En local (fichier HTML ouvert directement), laissez l'URL Notion directe.
-const NOTION_PROXY = "https://api.notion.com";
+const NOTION_PROXY = "https://notion-proxy.b2c-fact.workers.dev";
 // ─────────────────────────────────────────────────────────────
 
 async function notionFetch(endpoint, method, key, body) {
