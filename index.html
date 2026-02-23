@@ -15,7 +15,7 @@ export default {
     const notionPath = url.pathname + url.search;
 
     if (!notionPath.startsWith("/v1/")) {
-      return new Response(JSON.stringify({ error: "Invalid path" }), {
+      return new Response(JSON.stringify({ error: "Chemin invalide" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
@@ -23,7 +23,7 @@ export default {
 
     const authHeader = request.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+      return new Response(JSON.stringify({ error: "En-tête d'autorisation manquant" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
