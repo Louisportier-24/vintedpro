@@ -1139,7 +1139,7 @@ function getCellVal(p, type) {
     case 'date': return p.date?.start || null;
     case 'created_time': return p.created_time;
     case 'last_edited_time': return p.last_edited_time;
-    case 'formula': { const f=p.formula; return f?.(f.string??f.number??f.boolean??f.date?.start??null):null; }
+    case 'formula': { const f=p.formula; if (!f) return null; return f.string !== undefined ? f.string : f.number !== undefined ? f.number : f.boolean !== undefined ? f.boolean : (f.date && f.date.start) ? f.date.start : null; }
     case 'people': return (p.people||[]).map(x=>x.name||x.id).join(', ');
     default: return null;
   }
