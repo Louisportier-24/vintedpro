@@ -12,9 +12,12 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid path' });
   }
 
-  const TOKEN = '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';
+  // Token passé dans le header X-Token
+  const token = req.headers['x-token'];
+  if (!token) {
+    return res.status(401).json({ error: 'Token manquant' });
+  }
 
-  // Lire le body manuellement
   let bodyText = '';
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     bodyText = await new Promise((resolve) => {
@@ -27,7 +30,7 @@ module.exports = async function handler(req, res) {
   const notionRes = await fetch('https://api.notion.com' + notionPath, {
     method: req.method,
     headers: {
-      'Authorization': 'Bearer ' + TOKEN,
+      'Authorization': 'Bearer ' + token,
       'Content-Type': 'application/json',
       'Notion-Version': '2022-06-28',
     },
