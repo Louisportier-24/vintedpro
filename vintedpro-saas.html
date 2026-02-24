@@ -624,6 +624,10 @@ textarea.form-input { resize: vertical; min-height: 80px; line-height: 1.5; }
       <button class="btn btn-primary btn-full" id="login-btn">
         <span id="login-label">Se connecter</span>
       </button>
+      <div style="margin:16px 0;text-align:center;color:var(--muted);font-size:0.75rem">— ou —</div>
+      <button class="btn btn-ghost btn-full" onclick="window.location.href=NOTION_AUTH_URL">
+        <span>🔗</span> Connecter avec Notion
+      </button>
       <div class="login-footer">
         Pas encore de compte ? <a href="#">Contactez-nous</a>
       </div>
@@ -898,14 +902,16 @@ textarea.form-input { resize: vertical; min-height: 80px; line-height: 1.5; }
 // ═══════════════════════════════
 // FAKE USER DATABASE (demo)
 // ═══════════════════════════════
+const NOTION_AUTH_URL = 'https://api.notion.com/v1/oauth/authorize?client_id=311d872b-594c-81eb-a0d2-0037326a99c3&response_type=code&owner=user&redirect_uri=https://vintedpro-git-main-louis-projects-d4e275c4.vercel.app/api/callback';
+
 const USERS = {
   'demo@vintedpro.fr': {
     password: 'demo1234',
-    name: 'Marie L.',
-    pseudo: 'marie_montres',
-    notionKey: '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',
+    name: 'Louis P.',
+    pseudo: 'louisportier',
+    notionKey: localStorage.getItem('notion_oauth_token') || '',
     notionDbName: 'BDD Montres',
-    firstLogin: true,
+    firstLogin: !localStorage.getItem('notion_oauth_token'),
   }
 };
 
@@ -1086,11 +1092,13 @@ const NOTION_PROXY = "";  // Vercel — proxy relatif
 // ─────────────────────────────────────────────────────────────
 
 async function notionFetch(endpoint, method, key, body) {
-  // Vercel serverless proxy — /api/notion?path=/v1/...
   var url = '/api/notion?path=/v1' + endpoint;
   const opts = {
     method: method || 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'x-token': key,
+    },
     body: JSON.stringify(body || {}),
   };
   const r = await fetch(url, opts);
@@ -1617,6 +1625,14 @@ async function saveCard() {
 
 // ─── Init ───────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
+  // Récupérer le token OAuth depuis l'URL
+  var urlParams = new URLSearchParams(window.location.search);
+  var oauthToken = urlParams.get('token');
+  if (oauthToken) {
+    localStorage.setItem('notion_oauth_token', oauthToken);
+    window.history.replaceState({}, '', '/');
+  }
+  
   document.getElementById('login-btn').addEventListener('click', doLogin);
   document.getElementById('login-password').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') doLogin();
