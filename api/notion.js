@@ -12,7 +12,7 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid path' });
   }
 
-  const TOKEN = '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';
+  const TOKEN = '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';
 
   // Lire le body manuellement
   let bodyText = '';
