@@ -14,6 +14,16 @@ module.exports = async function handler(req, res) {
 
   const TOKEN = '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';
 
+  // Lire le body manuellement
+  let bodyText = '';
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    bodyText = await new Promise((resolve) => {
+      let data = '';
+      req.on('data', chunk => { data += chunk; });
+      req.on('end', () => resolve(data));
+    });
+  }
+
   const notionRes = await fetch('https://api.notion.com' + notionPath, {
     method: req.method,
     headers: {
@@ -21,7 +31,7 @@ module.exports = async function handler(req, res) {
       'Content-Type': 'application/json',
       'Notion-Version': '2022-06-28',
     },
-    body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
+    body: bodyText || undefined,
   });
 
   const data = await notionRes.json();
