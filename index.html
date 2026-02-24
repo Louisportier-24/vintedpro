@@ -909,11 +909,13 @@ const USERS = {
     password: 'demo1234',
     name: 'Louis P.',
     pseudo: 'louisportier',
-    notionKey: localStorage.getItem('notion_oauth_token') || '',
     notionDbName: 'BDD Montres',
-    firstLogin: !localStorage.getItem('notion_oauth_token'),
   }
 };
+
+function getUserNotionKey() {
+  return localStorage.getItem('notion_oauth_token') || '';
+}
 
 let currentUser = null;
 let state = {
@@ -952,7 +954,7 @@ async function doLogin() {
     return;
   }
 
-  currentUser = { ...user, email };
+  currentUser = { ...user, email, notionKey: getUserNotionKey() };
 
   // First login → onboarding
   if (currentUser.firstLogin) {
@@ -1001,6 +1003,7 @@ async function finishOnboarding() {
   btn.disabled = true;
   lbl.innerHTML = '<div class="spinner" style="border-top-color:#000;border-color:rgba(0,0,0,0.15)"></div> Chargement…';
   currentUser.firstLogin = false;
+  currentUser.notionKey = getUserNotionKey();
   currentUser.name = document.getElementById('ob-prenom').value || currentUser.name;
   await loadDashboard();
 }
@@ -1631,6 +1634,10 @@ document.addEventListener('DOMContentLoaded', function() {
   if (oauthToken) {
     localStorage.setItem('notion_oauth_token', oauthToken);
     window.history.replaceState({}, '', '/');
+    // Auto-login
+    currentUser = { ...USERS['demo@vintedpro.fr'], email: 'demo@vintedpro.fr', notionKey: oauthToken };
+    loadDashboard();
+    return;
   }
   
   document.getElementById('login-btn').addEventListener('click', doLogin);
