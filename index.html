@@ -1082,19 +1082,16 @@ async function fetchNotionData() {
 // 👇 CONFIGUREZ ICI l'URL de votre Cloudflare Worker après déploiement
 // Ex: "https://notion-proxy.votre-compte.workers.dev"
 // En local (fichier HTML ouvert directement), laissez l'URL Notion directe.
-const NOTION_PROXY = "https://notion-proxy.b2c-fact.workers.dev";
+const NOTION_PROXY = "";  // Vercel — proxy relatif
 // ─────────────────────────────────────────────────────────────
 
 async function notionFetch(endpoint, method, key, body) {
-  const url = NOTION_PROXY + '/v1' + endpoint;
-  // On injecte le token dans le body pour contourner la suppression des headers par Cloudflare
-  var bodyWithToken = Object.assign({}, body || {}, { __token: key });
+  // Vercel serverless proxy — /api/notion?path=/v1/...
+  var url = '/api/notion?path=/v1' + endpoint;
   const opts = {
     method: method || 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(bodyWithToken),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
   };
   const r = await fetch(url, opts);
   const d = await r.json();
