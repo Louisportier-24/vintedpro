@@ -1092,8 +1092,8 @@ async function fetchNotionData() {
   state.page = 0;
 
   // Afficher immédiatement les premiers résultats
-  renderView();
-  updateKPIs();
+  if (currentView === 'kanban') renderKanban(); else renderTable();
+  renderKPIs();
 
   // Charger le reste en arrière-plan
   if (firstRes.has_more) {
@@ -1104,8 +1104,8 @@ async function fetchNotionData() {
         state.allRows = state.allRows.concat(res.results);
         state.filteredRows = state.allRows.slice();
         cursor = res.has_more ? res.next_cursor : null;
-        renderView();
-        updateKPIs();
+        if (currentView === 'kanban') renderKanban(); else renderTable();
+        renderKPIs();
       }
     })();
   }
