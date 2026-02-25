@@ -1,6 +1,8 @@
-const crypto = require('crypto');
+export const config = { runtime: 'nodejs' };
 
-module.exports = async function handler(req, res) {
+import crypto from 'crypto';
+
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -8,13 +10,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  let body = '';
-  await new Promise((resolve) => {
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', resolve);
-  });
-
-  const { email, password } = JSON.parse(body);
+  const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });
 
   const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
@@ -22,12 +18,15 @@ module.exports = async function handler(req, res) {
   const SUPABASE_URL = 'https://gsrktfbxxzhifamjopvi.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_I2HSx4aU_MDihQrq9kGmsg_hpMNDiE_';
 
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}&password_hash=eq.${passwordHash}&is_active=eq.true&select=*`, {
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}&password_hash=eq.${passwordHash}&is_active=eq.true&select=*`,
+    {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+      }
     }
-  });
+  );
 
   const users = await response.json();
 
@@ -37,9 +36,8 @@ module.exports = async function handler(req, res) {
 
   const user = users[0];
 
-  // Vérifier la période d'essai
   if (user.trial_end && new Date(user.trial_end) < new Date()) {
-    return res.status(403).json({ error: 'Période d\'essai expirée' });
+    return res.status(403).json({ error: "Période d'essai expirée" });
   }
 
   return res.status(200).json({
@@ -48,4 +46,4 @@ module.exports = async function handler(req, res) {
     notionDbName: user.notion_db_name,
     trialEnd: user.trial_end,
   });
-};
+}
