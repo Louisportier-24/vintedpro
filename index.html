@@ -1102,10 +1102,7 @@ async function notionFetch(endpoint, method, key, body) {
   var url = '/api/notion?path=/v1' + endpoint;
   const opts = {
     method: method || 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'x-token': key,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body || {}),
   };
   const r = await fetch(url, opts);
