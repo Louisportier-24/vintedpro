@@ -3,34 +3,28 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(204).end();
 
   const notionPath = req.query.path;
   if (!notionPath || !notionPath.startsWith('/v1/')) {
     return res.status(400).json({ error: 'Invalid path' });
   }
 
-  // Token passé dans le header X-Token
-  const token = req.headers['x-token'];
-  if (!token) {
-    return res.status(401).json({ error: 'Token manquant' });
-  }
+  const TOKEN = process.env.NOTION_TOKEN;
+  if (!TOKEN) return res.status(500).json({ error: 'Token non configuré' });
 
   let bodyText = '';
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    bodyText = await new Promise((resolve) => {
-      let data = '';
-      req.on('data', chunk => { data += chunk; });
-      req.on('end', () => resolve(data));
+    await new Promise((resolve) => {
+      req.on('data', chunk => { bodyText += chunk; });
+      req.on('end', resolve);
     });
   }
 
   const notionRes = await fetch('https://api.notion.com' + notionPath, {
     method: req.method,
     headers: {
-      'Authorization': 'Bearer ' + token,
+      'Authorization': 'Bearer ' + TOKEN,
       'Content-Type': 'application/json',
       'Notion-Version': '2022-06-28',
     },
