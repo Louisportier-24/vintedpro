@@ -848,7 +848,7 @@ textarea.form-input { resize: vertical; min-height: 80px; line-height: 1.5; }
     <!-- Data section -->
     <div class="data-section">
       <div class="section-header">
-        <div class="section-title" id="table-title">BDD Montres</div>
+        <div class="section-title" id="table-title"></div>
         <div style="display:flex;align-items:center;gap:12px;">
           <span class="section-meta" id="table-meta"></span>
           <div class="view-toggle">
@@ -1023,6 +1023,7 @@ async function loadDashboard() {
   document.getElementById('sb-name').textContent = name;
   document.getElementById('sb-av').textContent = name.charAt(0).toUpperCase();
   document.getElementById('dash-title').textContent = `Bonjour, ${name.split(' ')[0]} 👋`;
+  document.getElementById('table-title').textContent = currentUser.notionDbName || 'Mes données';
 
   const now = new Date();
   document.getElementById('dash-sub').textContent =
