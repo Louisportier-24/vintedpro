@@ -1018,6 +1018,13 @@ async function finishOnboarding() {
 async function loadDashboard() {
   showScreen('screen-dashboard');
 
+  // Réinitialiser le state pour le nouvel utilisateur
+  state.allRows = [];
+  state.filteredRows = [];
+  state.properties = {};
+  state.dbId = null;
+  state.page = 0;
+
   // Set user info in sidebar
   const name = currentUser.name || currentUser.email;
   document.getElementById('sb-name').textContent = name;
