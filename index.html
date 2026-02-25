@@ -1078,7 +1078,11 @@ async function fetchNotionData() {
   if (!searchRes.results || !searchRes.results.length) {
     throw new Error('Base de données introuvable. Vérifiez les accès de l\'intégration.');
   }
-  const db = searchRes.results[0];
+  // Chercher la BDD dont le titre correspond exactement
+  const db = searchRes.results.find(function(r) {
+    var title = r.title && r.title.length ? r.title.map(function(t) { return t.plain_text; }).join('') : '';
+    return title === dbName;
+  }) || searchRes.results[0];
   state.properties = db.properties;
 
   // 2 — Chargement des entrées
