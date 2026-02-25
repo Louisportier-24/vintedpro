@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   const SUPABASE_KEY = 'sb_publishable_I2HSx4aU_MDihQrq9kGmsg_hpMNDiE_';
 
   const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}&password_hash=eq.${passwordHash}&is_active=eq.true&select=*`,
+    `${SUPABASE_URL}/rest/v1/Users?email=eq.${encodeURIComponent(email)}&password_hash=eq.${passwordHash}&is_active=eq.true&select=*`,
     {
       headers: {
         'apikey': SUPABASE_KEY,
