@@ -624,10 +624,7 @@ textarea.form-input { resize: vertical; min-height: 80px; line-height: 1.5; }
       <button class="btn btn-primary btn-full" id="login-btn">
         <span id="login-label">Se connecter</span>
       </button>
-      <div style="margin:16px 0;text-align:center;color:var(--muted);font-size:0.75rem">— ou —</div>
-      <button class="btn btn-ghost btn-full" onclick="window.location.href=NOTION_AUTH_URL">
-        <span>🔗</span> Connecter avec Notion
-      </button>
+
       <div class="login-footer">
         Pas encore de compte ? <a href="#">Contactez-nous</a>
       </div>
@@ -944,23 +941,30 @@ async function doLogin() {
   btn.disabled = true;
   lbl.innerHTML = '<div class="spinner"></div> Connexion…';
 
-  await sleep(900);
-
-  const user = USERS[email];
-  if (!user || user.password !== pwd) {
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pwd }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      btn.disabled = false;
+      lbl.textContent = 'Se connecter';
+      showLoginError(data.error || 'E-mail ou mot de passe incorrect.');
+      return;
+    }
+    currentUser = {
+      email: data.email,
+      name: data.name,
+      notionDbName: data.notionDbName,
+      trialEnd: data.trialEnd,
+    };
+    await loadDashboard();
+  } catch(e) {
     btn.disabled = false;
     lbl.textContent = 'Se connecter';
-    showLoginError('E-mail ou mot de passe incorrect.');
-    return;
-  }
-
-  currentUser = { ...user, email, notionKey: getUserNotionKey() };
-
-  // First login → onboarding
-  if (currentUser.firstLogin) {
-    showScreen('screen-onboarding');
-  } else {
-    await loadDashboard();
+    showLoginError('Erreur de connexion, réessayez.');
   }
 }
 
