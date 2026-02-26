@@ -862,8 +862,29 @@ textarea.form-input { resize: vertical; min-height: 80px; line-height: 1.5; }
             <button class="view-btn active" id="btn-kanban" onclick="setView('kanban')">⊞ Kanban</button>
             <button class="view-btn" id="btn-table" onclick="setView('table')">≡ Tableau</button>
           </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button class="view-btn" id="btn-filter" onclick="toggleFilterPanel()" style="display:flex;align-items:center;gap:4px;">
+              <span>⚡</span> Filtres <span id="filter-count-badge" style="display:none;background:var(--teal);color:#fff;border-radius:99px;padding:1px 6px;font-size:0.7rem"></span>
+            </button>
+            <button class="view-btn" id="btn-sort" onclick="toggleSortPanel()" style="display:flex;align-items:center;gap:4px;">
+              <span>↕</span> Tris <span id="sort-count-badge" style="display:none;background:var(--teal);color:#fff;border-radius:99px;padding:1px 6px;font-size:0.7rem"></span>
+            </button>
+          </div>
         </div>
       </div>
+
+      <!-- Filter panel -->
+      <div id="filter-panel" style="display:none;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2);">
+        <div id="filter-list"></div>
+        <button onclick="addFilter()" style="margin-top:8px;font-size:0.75rem;padding:4px 10px;border-radius:6px;border:1px dashed var(--border);background:none;color:var(--muted2);cursor:pointer;">+ Ajouter un filtre</button>
+      </div>
+
+      <!-- Sort panel -->
+      <div id="sort-panel" style="display:none;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2);">
+        <div id="sort-list"></div>
+        <button onclick="addSort()" style="margin-top:8px;font-size:0.75rem;padding:4px 10px;border-radius:6px;border:1px dashed var(--border);background:none;color:var(--muted2);cursor:pointer;">+ Ajouter un tri</button>
+      </div>
+
       <div class="toolbar">
         <input class="toolbar-search" placeholder="Rechercher…" oninput="onSearch(this.value)" id="search-input" />
       </div>
@@ -1190,6 +1211,8 @@ async function fetchNotionData() {
 
   const name = db.title && db.title.length ? db.title.map(function(t) { return t.plain_text; }).join('') : 'Mes données';
   document.getElementById('table-title').textContent = name;
+  // Initialiser filtres/tris après chargement
+  initViewSettings();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1510,6 +1533,12 @@ function statutColor(s) {
 
 function setView(v) {
   currentView = v;
+  // Fermer les panels et charger les settings de la nouvelle vue
+  document.getElementById('filter-panel').style.display = 'none';
+  document.getElementById('sort-panel').style.display = 'none';
+  viewSettings = loadViewSettings();
+  renderFilterPanel();
+  renderSortPanel();
   document.getElementById('btn-kanban').classList.toggle('active', v === 'kanban');
   document.getElementById('btn-table').classList.toggle('active', v === 'table');
   document.getElementById('kanban-view').style.display = v === 'kanban' ? 'flex' : 'none';
@@ -1574,6 +1603,205 @@ var SHOW_PROPS = ['Référence', 'Prix', 'Heure de publication', 'Date de vente'
 // Statuts masqués par défaut
 var HIDDEN_STATUTS = ['Historique de ventes', 'Invendues', 'Rupture', 'Indisponible/Rupture', 'Invendue (7-14j)', 'Invendue (+14j)'];
 var hiddenStatuts = HIDDEN_STATUTS.slice(); // copie modifiable
+
+
+// ═══════════════════════════════════════════
+// FILTRES ET TRIS PAR VUE
+// ═══════════════════════════════════════════
+
+function getViewKey() { return 'vp_view_' + currentView; }
+
+function loadViewSettings() {
+  var saved = localStorage.getItem(getViewKey());
+  return saved ? JSON.parse(saved) : { filters: [], sorts: [] };
+}
+
+function saveViewSettings(settings) {
+  localStorage.setItem(getViewKey(), JSON.stringify(settings));
+}
+
+var viewSettings = { filters: [], sorts: [] };
+
+function initViewSettings() {
+  viewSettings = loadViewSettings();
+  renderFilterPanel();
+  renderSortPanel();
+  applyFiltersAndSorts();
+}
+
+function toggleFilterPanel() {
+  var p = document.getElementById('filter-panel');
+  var s = document.getElementById('sort-panel');
+  s.style.display = 'none';
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleSortPanel() {
+  var p = document.getElementById('filter-panel');
+  var s = document.getElementById('sort-panel');
+  p.style.display = 'none';
+  s.style.display = s.style.display === 'none' ? 'block' : 'none';
+}
+
+function getFilterOps(type) {
+  if (type === 'number') return ['=', '≠', '<', '>', '≤', '≥'];
+  if (type === 'checkbox') return ['est coché', 'n'est pas coché'];
+  if (type === 'date') return ['avant', 'après', 'est'];
+  if (type === 'select') return ['est', 'n'est pas', 'est vide', 'n'est pas vide'];
+  return ['contient', 'ne contient pas', 'est', 'n'est pas', 'est vide', 'n'est pas vide'];
+}
+
+function renderFilterPanel() {
+  var list = document.getElementById('filter-list');
+  if (!list) return;
+  var cols = Object.keys(state.properties);
+  list.innerHTML = viewSettings.filters.map(function(f, i) {
+    var ops = getFilterOps(state.properties[f.col] ? state.properties[f.col].type : 'text');
+    var isCheckbox = state.properties[f.col] && state.properties[f.col].type === 'checkbox';
+    var isSelect = state.properties[f.col] && state.properties[f.col].type === 'select';
+    var selectOpts = isSelect ? (state.properties[f.col].select.options || []) : [];
+    return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">' +
+      '<select onchange="updateFilter(' + i + ','col',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">' +
+        cols.map(function(c) { return '<option value="' + esc(c) + '"' + (c === f.col ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') +
+      '</select>' +
+      '<select onchange="updateFilter(' + i + ','op',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">' +
+        ops.map(function(op) { return '<option' + (op === f.op ? ' selected' : '') + '>' + op + '</option>'; }).join('') +
+      '</select>' +
+      (isCheckbox ? '' : isSelect ?
+        '<select onchange="updateFilter(' + i + ','val',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">' +
+          selectOpts.map(function(o) { return '<option' + (o.name === f.val ? ' selected' : '') + '>' + esc(o.name) + '</option>'; }).join('') +
+        '</select>' :
+        '<input value="' + esc(f.val || '') + '" oninput="updateFilter(' + i + ','val',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);width:120px" placeholder="Valeur"/>') +
+      '<button onclick="removeFilter(' + i + ')" style="padding:2px 7px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted2);cursor:pointer;font-size:0.8rem">✕</button>' +
+    '</div>';
+  }).join('');
+  // Badge
+  var badge = document.getElementById('filter-count-badge');
+  if (badge) {
+    badge.style.display = viewSettings.filters.length ? 'inline' : 'none';
+    badge.textContent = viewSettings.filters.length;
+  }
+}
+
+function renderSortPanel() {
+  var list = document.getElementById('sort-list');
+  if (!list) return;
+  var cols = Object.keys(state.properties);
+  list.innerHTML = viewSettings.sorts.map(function(s, i) {
+    return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">' +
+      '<select onchange="updateSort(' + i + ','col',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">' +
+        cols.map(function(c) { return '<option value="' + esc(c) + '"' + (c === s.col ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') +
+      '</select>' +
+      '<select onchange="updateSort(' + i + ','dir',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">' +
+        '<option' + (s.dir === 'asc' ? ' selected' : '') + ' value="asc">↑ Croissant</option>' +
+        '<option' + (s.dir === 'desc' ? ' selected' : '') + ' value="desc">↓ Décroissant</option>' +
+      '</select>' +
+      '<button onclick="removeSort(' + i + ')" style="padding:2px 7px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted2);cursor:pointer;font-size:0.8rem">✕</button>' +
+    '</div>';
+  }).join('');
+  var badge = document.getElementById('sort-count-badge');
+  if (badge) {
+    badge.style.display = viewSettings.sorts.length ? 'inline' : 'none';
+    badge.textContent = viewSettings.sorts.length;
+  }
+}
+
+function addFilter() {
+  var cols = Object.keys(state.properties);
+  if (!cols.length) return;
+  viewSettings.filters.push({ col: cols[0], op: 'contient', val: '' });
+  saveViewSettings(viewSettings);
+  renderFilterPanel();
+}
+
+function addSort() {
+  var cols = Object.keys(state.properties);
+  if (!cols.length) return;
+  viewSettings.sorts.push({ col: cols[0], dir: 'asc' });
+  saveViewSettings(viewSettings);
+  renderSortPanel();
+}
+
+function updateFilter(i, key, val) {
+  viewSettings.filters[i][key] = val;
+  if (key === 'col') {
+    viewSettings.filters[i].op = getFilterOps(state.properties[val] ? state.properties[val].type : 'text')[0];
+    viewSettings.filters[i].val = '';
+  }
+  saveViewSettings(viewSettings);
+  renderFilterPanel();
+  applyFiltersAndSorts();
+}
+
+function updateSort(i, key, val) {
+  viewSettings.sorts[i][key] = val;
+  saveViewSettings(viewSettings);
+  applyFiltersAndSorts();
+}
+
+function removeFilter(i) {
+  viewSettings.filters.splice(i, 1);
+  saveViewSettings(viewSettings);
+  renderFilterPanel();
+  applyFiltersAndSorts();
+}
+
+function removeSort(i) {
+  viewSettings.sorts.splice(i, 1);
+  saveViewSettings(viewSettings);
+  renderSortPanel();
+  applyFiltersAndSorts();
+}
+
+function applyFiltersAndSorts() {
+  var rows = state.allRows.slice();
+
+  // Appliquer les filtres
+  viewSettings.filters.forEach(function(f) {
+    if (!f.col) return;
+    rows = rows.filter(function(row) {
+      var val = String(getPropVal(row, f.col) || '').toLowerCase();
+      var fval = String(f.val || '').toLowerCase();
+      var propType = state.properties[f.col] ? state.properties[f.col].type : 'text';
+      if (f.op === 'contient') return val.includes(fval);
+      if (f.op === 'ne contient pas') return !val.includes(fval);
+      if (f.op === 'est') return val === fval;
+      if (f.op === 'n'est pas') return val !== fval;
+      if (f.op === 'est vide') return !val || val === 'null' || val === 'undefined';
+      if (f.op === 'n'est pas vide') return val && val !== 'null' && val !== 'undefined';
+      if (f.op === 'est coché') return getPropVal(row, f.col) === true;
+      if (f.op === 'n'est pas coché') return getPropVal(row, f.col) !== true;
+      if (f.op === '=') return parseFloat(val) === parseFloat(fval);
+      if (f.op === '≠') return parseFloat(val) !== parseFloat(fval);
+      if (f.op === '<') return parseFloat(val) < parseFloat(fval);
+      if (f.op === '>') return parseFloat(val) > parseFloat(fval);
+      if (f.op === '≤') return parseFloat(val) <= parseFloat(fval);
+      if (f.op === '≥') return parseFloat(val) >= parseFloat(fval);
+      if (f.op === 'avant') return new Date(val) < new Date(fval);
+      if (f.op === 'après') return new Date(val) > new Date(fval);
+      return true;
+    });
+  });
+
+  // Appliquer les tris
+  if (viewSettings.sorts.length) {
+    rows.sort(function(a, b) {
+      for (var i = 0; i < viewSettings.sorts.length; i++) {
+        var s = viewSettings.sorts[i];
+        var va = String(getPropVal(a, s.col) || '');
+        var vb = String(getPropVal(b, s.col) || '');
+        var n = isNaN(va) || isNaN(vb) ? va.localeCompare(vb) : parseFloat(va) - parseFloat(vb);
+        if (n !== 0) return s.dir === 'desc' ? -n : n;
+      }
+      return 0;
+    });
+  }
+
+  state.filteredRows = rows;
+  state.page = 0;
+  if (currentView === 'kanban') renderKanban(); else renderTable();
+  renderKPIs();
+}
 
 function renderKanban() {
   var rows = state.filteredRows;
