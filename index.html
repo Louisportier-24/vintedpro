@@ -1113,11 +1113,13 @@ async function fetchNotionData() {
     { property: 'Date de vente', direction: 'ascending' },
   ].filter(function(s) { return availableProps.indexOf(s.property) >= 0; });
 
-  const activeFilter = {
+  // Filtre actifs seulement si la colonne existe
+  const hasStatut = availableProps.indexOf('Statut de la montre') >= 0;
+  const activeFilter = hasStatut ? {
     or: ACTIVE_STATUTS.map(function(s) {
       return { property: 'Statut de la montre', select: { equals: s } };
     })
-  };
+  } : null;
 
   // Afficher la barre de progression dès le début
   var progressEl = document.getElementById('loading-progress');
@@ -1133,7 +1135,8 @@ async function fetchNotionData() {
   // 1er chargement : statuts actifs uniquement
   let activeRows = [], cursor, activePage = 0;
   do {
-    const body = { page_size: 100, sorts: sorts, filter: activeFilter };
+    const body = { page_size: 100, sorts: sorts };
+    if (activeFilter) body.filter = activeFilter;
     if (cursor) body.start_cursor = cursor;
     const res = await notionFetch('/databases/' + db.id + '/query', 'POST', key, body);
     activeRows = activeRows.concat(res.results);
@@ -1163,7 +1166,8 @@ async function fetchNotionData() {
 
     let archivedRows = [], arCursor, page = 0;
     do {
-      const body = { page_size: 100, sorts: sorts, filter: archivedFilter };
+      const body = { page_size: 100, sorts: sorts };
+      if (hasStatut) body.filter = archivedFilter;
       if (arCursor) body.start_cursor = arCursor;
       const res = await notionFetch('/databases/' + db.id + '/query', 'POST', key, body);
       archivedRows = archivedRows.concat(res.results);
@@ -1258,6 +1262,9 @@ function renderKPIs() {
 var PRIORITY_COLS = ['Nom','Titre','Référence','Statut','Prix','Taux de vente','Ventes du mois','Shop','Boost','Date de vente','Couleur','Photo à jour','Heure de publication'];
 var HIDDEN_COLS = ['Description','Desc'];
 
+// Ordre personnalisé des colonnes
+var customColOrder = JSON.parse(localStorage.getItem('vp_col_order') || 'null');
+
 function getVisibleCols(props) {
   var all = Object.keys(props);
   var filtered = all.filter(function(c) {
@@ -1267,7 +1274,33 @@ function getVisibleCols(props) {
     return filtered.find(function(c) { return c.toLowerCase().includes(p.toLowerCase()); });
   }).filter(Boolean);
   var rest = filtered.filter(function(c) { return !mapped.includes(c); });
-  return mapped.concat(rest);
+  var base = mapped.concat(rest);
+  // Appliquer l'ordre personnalisé si existant
+  if (customColOrder) {
+    var ordered = customColOrder.filter(function(c) { return base.includes(c); });
+    var remaining = base.filter(function(c) { return !ordered.includes(c); });
+    return ordered.concat(remaining);
+  }
+  return base;
+}
+
+var _dragColIdx = null;
+function colDragStart(e) {
+  _dragColIdx = parseInt(e.currentTarget.getAttribute('data-idx'));
+  e.dataTransfer.effectAllowed = 'move';
+}
+function colDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function colDrop(e) {
+  e.preventDefault();
+  var toIdx = parseInt(e.currentTarget.getAttribute('data-idx'));
+  if (_dragColIdx === null || _dragColIdx === toIdx) return;
+  var cols = getVisibleCols(state.properties);
+  var moved = cols.splice(_dragColIdx, 1)[0];
+  cols.splice(toIdx, 0, moved);
+  customColOrder = cols;
+  localStorage.setItem('vp_col_order', JSON.stringify(cols));
+  _dragColIdx = null;
+  renderTable();
 }
 
 function renderTable() {
@@ -1280,8 +1313,11 @@ function renderTable() {
 
   document.getElementById('table-meta').textContent = rows.length + ' résultat' + (rows.length > 1 ? 's' : '');
 
-  document.getElementById('t-head').innerHTML = cols.map(function(c) {
-    return '<th style="white-space:nowrap">' + esc(c) + '</th>';
+  document.getElementById('t-head').innerHTML = cols.map(function(c, i) {
+    return '<th style="white-space:nowrap;cursor:grab;user-select:none" ' +
+      'draggable="true" data-col="' + esc(c) + '" data-idx="' + i + '" ' +
+      'ondragstart="colDragStart(event)" ondragover="colDragOver(event)" ondrop="colDrop(event)">' +
+      esc(c) + ' <span style="opacity:0.3;font-size:0.7rem">⠿</span></th>';
   }).join('');
 
   if (!rows.length) {
@@ -1418,6 +1454,8 @@ function setNav(el) {
 function logout() {
   currentUser = null;
   localStorage.removeItem('vp_session');
+  window.location.reload();
+  return;
   state = { properties: {}, allRows: [], filteredRows: [], page: 0, pageSize: 20, searchQuery: '' };
   document.getElementById('login-email').value = '';
   document.getElementById('login-password').value = '';
@@ -1620,7 +1658,9 @@ function renderCard(row) {
   var propsHtml = SHOW_PROPS.map(function(key) {
     var val = getPropVal(row, key);
     if (!val) return '';
-    return '<div class="montre-prop">' +
+    var propType = state.properties[key] ? state.properties[key].type : null;
+    var editable = ['number','select','checkbox','date','rich_text','title','url','phone_number','email'].includes(propType);
+    return '<div class="montre-prop"' + (editable ? ' data-prop="' + esc(key) + '" data-row="' + row.id + '" title="Cliquer pour modifier" style="cursor:pointer"' : '') + '>' +
       '<span class="montre-prop-key">' + esc(key) + '</span>' +
       '<span class="montre-prop-val">' + esc(String(val)) + '</span>' +
     '</div>';
@@ -1637,6 +1677,86 @@ function renderCard(row) {
 }
 
 
+
+// ═══════════════════════════════════════════
+// ÉDITION INLINE
+// ═══════════════════════════════════════════
+function openInlineEdit(rowId, propEl) {
+  var propName = propEl.getAttribute('data-prop');
+  var row = state.allRows.find(function(r) { return r.id === rowId; });
+  if (!row || !propName) return;
+
+  var propType = state.properties[propName] ? state.properties[propName].type : null;
+  var currentVal = getPropVal(row, propName);
+  var valEl = propEl.querySelector('.montre-prop-val');
+  if (!valEl) return;
+
+  var input;
+  if (propType === 'checkbox') {
+    // Toggle direct pour checkbox
+    var newVal = !currentVal;
+    valEl.textContent = newVal ? 'Oui' : 'Non';
+    saveInlineEdit(rowId, propName, propType, newVal, propEl, row);
+    return;
+  } else if (propType === 'select') {
+    var options = state.properties[propName].select && state.properties[propName].select.options || [];
+    input = document.createElement('select');
+    input.style.cssText = 'font-size:0.78rem;padding:2px 4px;border-radius:4px;border:1px solid var(--teal);background:var(--surface2);color:var(--text);max-width:120px';
+    options.forEach(function(opt) {
+      var o = document.createElement('option');
+      o.value = opt.name;
+      o.textContent = opt.name;
+      if (opt.name === currentVal) o.selected = true;
+      input.appendChild(o);
+    });
+  } else {
+    input = document.createElement('input');
+    input.type = propType === 'date' ? 'date' : propType === 'number' ? 'number' : 'text';
+    input.value = currentVal || '';
+    input.style.cssText = 'font-size:0.78rem;padding:2px 4px;border-radius:4px;border:1px solid var(--teal);background:var(--surface2);color:var(--text);max-width:120px';
+  }
+
+  valEl.innerHTML = '';
+  valEl.appendChild(input);
+  input.focus();
+
+  function save() {
+    saveInlineEdit(rowId, propName, propType, input.value, propEl, row);
+  }
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { valEl.textContent = esc(String(currentVal || '')); }
+  });
+  if (propType === 'select') input.addEventListener('change', save);
+}
+
+async function saveInlineEdit(rowId, propName, propType, newVal, propEl, row) {
+  var valEl = propEl.querySelector('.montre-prop-val');
+  var body = { properties: {} };
+  if (propType === 'number') body.properties[propName] = { number: parseFloat(newVal) || null };
+  else if (propType === 'checkbox') body.properties[propName] = { checkbox: newVal };
+  else if (propType === 'select') body.properties[propName] = { select: newVal ? { name: newVal } : null };
+  else if (propType === 'date') body.properties[propName] = { date: newVal ? { start: newVal } : null };
+  else if (propType === 'url') body.properties[propName] = { url: newVal || null };
+  else if (propType === 'email') body.properties[propName] = { email: newVal || null };
+  else if (propType === 'phone_number') body.properties[propName] = { phone_number: newVal || null };
+  else body.properties[propName] = { rich_text: [{ text: { content: newVal || '' } }] };
+
+  try {
+    await notionFetch('/pages/' + rowId, 'PATCH', null, body);
+    if (valEl) valEl.textContent = newVal || '—';
+    // Mettre à jour le state local
+    var stateRow = state.allRows.find(function(r) { return r.id === rowId; });
+    if (stateRow && stateRow.properties[propName]) {
+      if (propType === 'number') stateRow.properties[propName].number = parseFloat(newVal) || null;
+      else if (propType === 'checkbox') stateRow.properties[propName].checkbox = newVal;
+    }
+  } catch(e) {
+    if (valEl) valEl.textContent = getPropVal(row, propName) || '—';
+    alert('Erreur de sauvegarde : ' + e.message);
+  }
+}
 
 // ═══════════════════════════════════════════
 // MODAL ÉDITION
