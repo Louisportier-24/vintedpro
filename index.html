@@ -988,7 +988,6 @@ async function doLogin() {
       notionDbName: data.notionDbName,
       trialEnd: data.trialEnd,
     };
-    localStorage.setItem('vp_session', JSON.stringify(currentUser));
     await loadDashboard();
   } catch(e) {
     btn.disabled = false;
@@ -1476,7 +1475,6 @@ function setNav(el) {
 
 function logout() {
   currentUser = null;
-  localStorage.removeItem('vp_session');
   window.location.reload();
   return;
   state = { properties: {}, allRows: [], filteredRows: [], page: 0, pageSize: 20, searchQuery: '' };
@@ -2144,22 +2142,10 @@ document.addEventListener('DOMContentLoaded', function() {
     return;
   }
 
-  // Enregistrer les event listeners en premier
   document.getElementById('login-btn').addEventListener('click', doLogin);
   document.getElementById('login-password').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') doLogin();
   });
-
-  // Restaurer la session si elle existe
-  var savedSession = localStorage.getItem('vp_session');
-  if (savedSession) {
-    try {
-      currentUser = JSON.parse(savedSession);
-      setTimeout(function() { loadDashboard(); }, 100);
-    } catch(e) {
-      localStorage.removeItem('vp_session');
-    }
-  }
 });
 </script>
 </body>
