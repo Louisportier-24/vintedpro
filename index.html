@@ -1086,38 +1086,53 @@ async function fetchNotionData() {
   state.properties = db.properties;
 
   // 2 — Chargement des entrées — affichage immédiat + chargement en arrière-plan
-  const sortBody = {
-    page_size: 100,
-    sorts: [
-      { property: 'Sélection', direction: 'descending' },
-      { property: 'Heure de publication', direction: 'ascending' },
-      { property: 'Stock', direction: 'descending' },
-      { property: 'Date de vente', direction: 'ascending' },
-    ]
+  const ACTIVE_STATUTS = ['En vente', 'Disponible', 'Disponible*', 'En prépa.', 'Invendue (7-14j)', 'Invendue (+14j)'];
+  
+  const sorts = [
+    { property: 'Sélection', direction: 'descending' },
+    { property: 'Heure de publication', direction: 'ascending' },
+    { property: 'Stock', direction: 'descending' },
+    { property: 'Date de vente', direction: 'ascending' },
+  ];
+
+  const activeFilter = {
+    or: ACTIVE_STATUTS.map(function(s) {
+      return { property: 'Statut de la montre', status: { equals: s } };
+    })
   };
-  const firstRes = await notionFetch('/databases/' + db.id + '/query', 'POST', key, sortBody);
-  state.allRows = firstRes.results;
-  state.filteredRows = firstRes.results.slice();
-  state.page = 0;
 
-  // Afficher immédiatement les premiers résultats
-  if (currentView === 'kanban') renderKanban(); else renderTable();
-  renderKPIs();
+  // 1er chargement : statuts actifs uniquement
+  let activeRows = [], cursor;
+  do {
+    const body = { page_size: 100, sorts: sorts, filter: activeFilter };
+    if (cursor) body.start_cursor = cursor;
+    const res = await notionFetch('/databases/' + db.id + '/query', 'POST', key, body);
+    activeRows = activeRows.concat(res.results);
+    cursor = res.has_more ? res.next_cursor : null;
+    state.allRows = activeRows.slice();
+    state.filteredRows = activeRows.slice();
+    state.page = 0;
+    if (currentView === 'kanban') renderKanban(); else renderTable();
+    renderKPIs();
+  } while (cursor);
 
-  // Charger le reste en arrière-plan
-  if (firstRes.has_more) {
-    let cursor = firstRes.next_cursor;
-    (async function loadMore() {
-      while (cursor) {
-        const res = await notionFetch('/databases/' + db.id + '/query', 'POST', key, { ...sortBody, start_cursor: cursor });
-        state.allRows = state.allRows.concat(res.results);
-        state.filteredRows = state.allRows.slice();
-        cursor = res.has_more ? res.next_cursor : null;
-        if (currentView === 'kanban') renderKanban(); else renderTable();
-        renderKPIs();
-      }
-    })();
-  }
+  // Chargement du reste en arrière-plan (statuts archivés)
+  (async function loadArchived() {
+    const archivedFilter = {
+      not: activeFilter
+    };
+    let arCursor;
+    do {
+      const body = { page_size: 100, sorts: sorts, filter: archivedFilter };
+      if (arCursor) body.start_cursor = arCursor;
+      const res = await notionFetch('/databases/' + db.id + '/query', 'POST', key, body);
+      state.allRows = state.allRows.concat(res.results);
+      state.filteredRows = state.allRows.slice();
+      arCursor = res.has_more ? res.next_cursor : null;
+      if (currentView === 'kanban') renderKanban(); else renderTable();
+      renderKPIs();
+    } while (arCursor);
+  })();
 
   const name = db.title && db.title.length ? db.title.map(function(t) { return t.plain_text; }).join('') : 'Mes données';
   document.getElementById('table-title').textContent = name;
