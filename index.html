@@ -1119,7 +1119,13 @@ async function fetchNotionData() {
   // Chargement du reste en arrière-plan (statuts archivés)
   (async function loadArchived() {
     const archivedFilter = {
-      not: activeFilter
+      or: [
+        { property: 'Statut de la montre', select: { equals: 'Historique de ventes' } },
+        { property: 'Statut de la montre', select: { equals: 'Invendues' } },
+        { property: 'Statut de la montre', select: { equals: 'Rupture' } },
+        { property: 'Statut de la montre', select: { equals: 'Indisponible/Rupture' } },
+        { property: 'Statut de la montre', select: { is_empty: true } },
+      ]
     };
     let arCursor;
     do {
