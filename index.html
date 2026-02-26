@@ -1096,12 +1096,14 @@ async function fetchNotionData() {
   // 2 — Chargement des entrées — affichage immédiat + chargement en arrière-plan
   const ACTIVE_STATUTS = ['En vente', 'Invendue (+14j)', 'Disponible*', 'Disponible', 'En prépa.', 'Invendue (7-14j)'];
   
+  // Tris basés sur les propriétés disponibles
+  const availableProps = Object.keys(db.properties);
   const sorts = [
     { property: 'Sélection', direction: 'descending' },
     { property: 'Heure de publication', direction: 'ascending' },
     { property: 'Stock', direction: 'descending' },
     { property: 'Date de vente', direction: 'ascending' },
-  ];
+  ].filter(function(s) { return availableProps.indexOf(s.property) >= 0; });
 
   const activeFilter = {
     or: ACTIVE_STATUTS.map(function(s) {
