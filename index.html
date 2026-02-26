@@ -1881,3 +1881,16 @@ function applyFiltersAndSorts() {
   if (currentView === 'kanban') renderKanban(); else renderTable();
   renderKPIs();
 }
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('login-btn').addEventListener('click', doLogin);
+  document.getElementById('login-password').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+});
+
+</script>
+</body>
+</html>
