@@ -1417,6 +1417,7 @@ function setNav(el) {
 
 function logout() {
   currentUser = null;
+  localStorage.removeItem('vp_session');
   state = { properties: {}, allRows: [], filteredRows: [], page: 0, pageSize: 20, searchQuery: '' };
   document.getElementById('login-email').value = '';
   document.getElementById('login-password').value = '';
