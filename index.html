@@ -1630,50 +1630,106 @@ function initViewSettings() {
 function toggleFilterPanel() {
   var p = document.getElementById('filter-panel');
   var s = document.getElementById('sort-panel');
-  s.style.display = 'none';
-  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  if (s) s.style.display = 'none';
+  if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
 }
 
 function toggleSortPanel() {
   var p = document.getElementById('filter-panel');
   var s = document.getElementById('sort-panel');
-  p.style.display = 'none';
-  s.style.display = s.style.display === 'none' ? 'block' : 'none';
+  if (p) p.style.display = 'none';
+  if (s) s.style.display = s.style.display === 'none' ? 'block' : 'none';
 }
 
 function getFilterOps(type) {
-  if (type === 'number') return ['=', '≠', '<', '>', '≤', '≥'];
-  if (type === 'checkbox') return ['est coche', 'non coche'];
-  if (type === 'date') return ['avant', 'après', 'est'];
-  if (type === 'select') return ['est', 'different', 'est vide', 'non vide'];
-  return ['contient', 'ne contient pas', 'est', 'different', 'est vide', 'non vide'];
+  if (type === 'number') return ['egal', 'different', 'inferieur', 'superieur'];
+  if (type === 'checkbox') return ['coche', 'non_coche'];
+  if (type === 'date') return ['avant', 'apres', 'egal'];
+  if (type === 'select') return ['egal', 'different', 'vide', 'non_vide'];
+  return ['contient', 'ne_contient_pas', 'egal', 'different', 'vide', 'non_vide'];
+}
+
+function getFilterOpLabel(op) {
+  var labels = {
+    'egal': 'est', 'different': "n'est pas", 'inferieur': '<', 'superieur': '>',
+    'coche': 'est coché', 'non_coche': "n'est pas coché",
+    'avant': 'avant', 'apres': 'après',
+    'contient': 'contient', 'ne_contient_pas': 'ne contient pas',
+    'vide': 'est vide', 'non_vide': "n'est pas vide"
+  };
+  return labels[op] || op;
 }
 
 function renderFilterPanel() {
   var list = document.getElementById('filter-list');
   if (!list) return;
+  list.innerHTML = '';
   var cols = Object.keys(state.properties);
-  list.innerHTML = viewSettings.filters.map(function(f, i) {
-    var ops = getFilterOps(state.properties[f.col] ? state.properties[f.col].type : 'text');
-    var isCheckbox = state.properties[f.col] && state.properties[f.col].type === 'checkbox';
-    var isSelect = state.properties[f.col] && state.properties[f.col].type === 'select';
-    var selectOpts = isSelect ? (state.properties[f.col].select.options || []) : [];
-    return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">' +
-      '<select onchange="updateFilter(' + i + ','col',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">' +
-        cols.map(function(c) { return '<option value="' + esc(c) + '"' + (c === f.col ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') +
-      '</select>' +
-      '<select onchange="updateFilter(' + i + ','op',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">' +
-        ops.map(function(op) { return '<option' + (op === f.op ? ' selected' : '') + '>' + op + '</option>'; }).join('') +
-      '</select>' +
-      (isCheckbox ? '' : isSelect ?
-        '<select onchange="updateFilter(' + i + ','val',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">' +
-          selectOpts.map(function(o) { return '<option' + (o.name === f.val ? ' selected' : '') + '>' + esc(o.name) + '</option>'; }).join('') +
-        '</select>' :
-        '<input value="' + esc(f.val || '') + '" oninput="updateFilter(' + i + ','val',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);width:120px" placeholder="Valeur"/>') +
-      '<button onclick="removeFilter(' + i + ')" style="padding:2px 7px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted2);cursor:pointer;font-size:0.8rem">✕</button>' +
-    '</div>';
-  }).join('');
-  // Badge
+
+  viewSettings.filters.forEach(function(f, i) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;';
+
+    var colSel = document.createElement('select');
+    colSel.style.cssText = 'font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)';
+    cols.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      if (c === f.col) opt.selected = true;
+      colSel.appendChild(opt);
+    });
+    colSel.addEventListener('change', function() { updateFilter(i, 'col', this.value); });
+
+    var propType = state.properties[f.col] ? state.properties[f.col].type : 'text';
+    var ops = getFilterOps(propType);
+
+    var opSel = document.createElement('select');
+    opSel.style.cssText = 'font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)';
+    ops.forEach(function(op) {
+      var opt = document.createElement('option');
+      opt.value = op; opt.textContent = getFilterOpLabel(op);
+      if (op === f.op) opt.selected = true;
+      opSel.appendChild(opt);
+    });
+    opSel.addEventListener('change', function() { updateFilter(i, 'op', this.value); });
+
+    var delBtn = document.createElement('button');
+    delBtn.textContent = '✕';
+    delBtn.style.cssText = 'padding:2px 7px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted2);cursor:pointer;font-size:0.8rem';
+    delBtn.addEventListener('click', function() { removeFilter(i); });
+
+    row.appendChild(colSel);
+    row.appendChild(opSel);
+
+    var isCheckbox = propType === 'checkbox';
+    var isVide = f.op === 'vide' || f.op === 'non_vide' || f.op === 'coche' || f.op === 'non_coche';
+    if (!isCheckbox && !isVide) {
+      if (propType === 'select') {
+        var valSel = document.createElement('select');
+        valSel.style.cssText = 'font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)';
+        var selectOpts = (state.properties[f.col].select && state.properties[f.col].select.options) || [];
+        selectOpts.forEach(function(o) {
+          var opt = document.createElement('option');
+          opt.value = o.name; opt.textContent = o.name;
+          if (o.name === f.val) opt.selected = true;
+          valSel.appendChild(opt);
+        });
+        valSel.addEventListener('change', function() { updateFilter(i, 'val', this.value); });
+        row.appendChild(valSel);
+      } else {
+        var valInput = document.createElement('input');
+        valInput.value = f.val || '';
+        valInput.placeholder = 'Valeur';
+        valInput.style.cssText = 'font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);width:120px';
+        valInput.addEventListener('input', function() { updateFilter(i, 'val', this.value); });
+        row.appendChild(valInput);
+      }
+    }
+
+    row.appendChild(delBtn);
+    list.appendChild(row);
+  });
+
   var badge = document.getElementById('filter-count-badge');
   if (badge) {
     badge.style.display = viewSettings.filters.length ? 'inline' : 'none';
@@ -1684,19 +1740,46 @@ function renderFilterPanel() {
 function renderSortPanel() {
   var list = document.getElementById('sort-list');
   if (!list) return;
+  list.innerHTML = '';
   var cols = Object.keys(state.properties);
-  list.innerHTML = viewSettings.sorts.map(function(s, i) {
-    return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">' +
-      '<select onchange="updateSort(' + i + ','col',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">' +
-        cols.map(function(c) { return '<option value="' + esc(c) + '"' + (c === s.col ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') +
-      '</select>' +
-      '<select onchange="updateSort(' + i + ','dir',this.value)" style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">' +
-        '<option' + (s.dir === 'asc' ? ' selected' : '') + ' value="asc">↑ Croissant</option>' +
-        '<option' + (s.dir === 'desc' ? ' selected' : '') + ' value="desc">↓ Décroissant</option>' +
-      '</select>' +
-      '<button onclick="removeSort(' + i + ')" style="padding:2px 7px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted2);cursor:pointer;font-size:0.8rem">✕</button>' +
-    '</div>';
-  }).join('');
+
+  viewSettings.sorts.forEach(function(s, i) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
+
+    var colSel = document.createElement('select');
+    colSel.style.cssText = 'font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)';
+    cols.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      if (c === s.col) opt.selected = true;
+      colSel.appendChild(opt);
+    });
+    colSel.addEventListener('change', function() { updateSort(i, 'col', this.value); });
+
+    var dirSel = document.createElement('select');
+    dirSel.style.cssText = 'font-size:0.75rem;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)';
+    var ascOpt = document.createElement('option');
+    ascOpt.value = 'asc'; ascOpt.textContent = '↑ Croissant';
+    if (s.dir === 'asc') ascOpt.selected = true;
+    var descOpt = document.createElement('option');
+    descOpt.value = 'desc'; descOpt.textContent = '↓ Décroissant';
+    if (s.dir === 'desc') descOpt.selected = true;
+    dirSel.appendChild(ascOpt);
+    dirSel.appendChild(descOpt);
+    dirSel.addEventListener('change', function() { updateSort(i, 'dir', this.value); });
+
+    var delBtn = document.createElement('button');
+    delBtn.textContent = '✕';
+    delBtn.style.cssText = 'padding:2px 7px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted2);cursor:pointer;font-size:0.8rem';
+    delBtn.addEventListener('click', function() { removeSort(i); });
+
+    row.appendChild(colSel);
+    row.appendChild(dirSel);
+    row.appendChild(delBtn);
+    list.appendChild(row);
+  });
+
   var badge = document.getElementById('sort-count-badge');
   if (badge) {
     badge.style.display = viewSettings.sorts.length ? 'inline' : 'none';
@@ -1707,7 +1790,8 @@ function renderSortPanel() {
 function addFilter() {
   var cols = Object.keys(state.properties);
   if (!cols.length) return;
-  viewSettings.filters.push({ col: cols[0], op: 'contient', val: '' });
+  var propType = state.properties[cols[0]] ? state.properties[cols[0]].type : 'text';
+  viewSettings.filters.push({ col: cols[0], op: getFilterOps(propType)[0], val: '' });
   saveViewSettings(viewSettings);
   renderFilterPanel();
 }
@@ -1721,9 +1805,11 @@ function addSort() {
 }
 
 function updateFilter(i, key, val) {
+  if (!viewSettings.filters[i]) return;
   viewSettings.filters[i][key] = val;
   if (key === 'col') {
-    viewSettings.filters[i].op = getFilterOps(state.properties[val] ? state.properties[val].type : 'text')[0];
+    var propType = state.properties[val] ? state.properties[val].type : 'text';
+    viewSettings.filters[i].op = getFilterOps(propType)[0];
     viewSettings.filters[i].val = '';
   }
   saveViewSettings(viewSettings);
@@ -1732,6 +1818,7 @@ function updateFilter(i, key, val) {
 }
 
 function updateSort(i, key, val) {
+  if (!viewSettings.sorts[i]) return;
   viewSettings.sorts[i][key] = val;
   saveViewSettings(viewSettings);
   applyFiltersAndSorts();
@@ -1754,34 +1841,28 @@ function removeSort(i) {
 function applyFiltersAndSorts() {
   var rows = state.allRows.slice();
 
-  // Appliquer les filtres
   viewSettings.filters.forEach(function(f) {
     if (!f.col) return;
     rows = rows.filter(function(row) {
-      var val = String(getPropVal(row, f.col) || '').toLowerCase();
+      var rawVal = getPropVal(row, f.col);
+      var val = String(rawVal || '').toLowerCase();
       var fval = String(f.val || '').toLowerCase();
-      var propType = state.properties[f.col] ? state.properties[f.col].type : 'text';
       if (f.op === 'contient') return val.includes(fval);
-      if (f.op === 'ne contient pas') return !val.includes(fval);
-      if (f.op === 'est') return val === fval;
-      if (f.op === 'n'est pas') return val !== fval;
-      if (f.op === 'est vide') return !val || val === 'null' || val === 'undefined';
-      if (f.op === 'n'est pas vide') return val && val !== 'null' && val !== 'undefined';
-      if (f.op === 'est coché') return getPropVal(row, f.col) === true;
-      if (f.op === 'n'est pas coché') return getPropVal(row, f.col) !== true;
-      if (f.op === '=') return parseFloat(val) === parseFloat(fval);
-      if (f.op === '≠') return parseFloat(val) !== parseFloat(fval);
-      if (f.op === '<') return parseFloat(val) < parseFloat(fval);
-      if (f.op === '>') return parseFloat(val) > parseFloat(fval);
-      if (f.op === '≤') return parseFloat(val) <= parseFloat(fval);
-      if (f.op === '≥') return parseFloat(val) >= parseFloat(fval);
+      if (f.op === 'ne_contient_pas') return !val.includes(fval);
+      if (f.op === 'egal') return val === fval;
+      if (f.op === 'different') return val !== fval;
+      if (f.op === 'vide') return !rawVal && rawVal !== 0 && rawVal !== false;
+      if (f.op === 'non_vide') return rawVal !== null && rawVal !== undefined && rawVal !== '';
+      if (f.op === 'coche') return rawVal === true;
+      if (f.op === 'non_coche') return rawVal !== true;
+      if (f.op === 'inferieur') return parseFloat(val) < parseFloat(fval);
+      if (f.op === 'superieur') return parseFloat(val) > parseFloat(fval);
       if (f.op === 'avant') return new Date(val) < new Date(fval);
-      if (f.op === 'après') return new Date(val) > new Date(fval);
+      if (f.op === 'apres') return new Date(val) > new Date(fval);
       return true;
     });
   });
 
-  // Appliquer les tris
   if (viewSettings.sorts.length) {
     rows.sort(function(a, b) {
       for (var i = 0; i < viewSettings.sorts.length; i++) {
@@ -1800,353 +1881,3 @@ function applyFiltersAndSorts() {
   if (currentView === 'kanban') renderKanban(); else renderTable();
   renderKPIs();
 }
-
-function renderKanban() {
-  var rows = state.filteredRows;
-
-  // Grouper par statut
-  var DEFAULT_STATUTS = [
-    'En vente', 'Disponible*', 'Disponible', 'En prépa.', 'Invendue (7-14j)', 'Invendue (+14j)',
-    'Historique de ventes', 'Invendues', 'Rupture', 'Indisponible/Rupture'
-  ];
-  var savedKanbanOrder = JSON.parse(localStorage.getItem('vp_kanban_order') || 'null');
-  var ALL_KNOWN_STATUTS = savedKanbanOrder || DEFAULT_STATUTS;
-  var groups = {};
-  var groupOrder = [];
-  // Initialiser tous les statuts connus (même vides)
-  ALL_KNOWN_STATUTS.forEach(function(s) { groups[s] = []; groupOrder.push(s); });
-  rows.forEach(function(row) {
-    var s = getStatut(row);
-    if (!groups[s]) { groups[s] = []; groupOrder.push(s); }
-    groups[s].push(row);
-  });
-
-  // Render statut filter bar
-  var allStatuts = groupOrder;
-  var filterEl = document.getElementById('statut-filter-bar');
-  if (filterEl) {
-    filterEl.innerHTML = allStatuts.map(function(s) {
-      var hidden = hiddenStatuts.indexOf(s) >= 0;
-      var color = statutColor(s);
-      return '<button class="statut-filter-btn' + (hidden ? '' : ' active') + '" ' +
-        'data-statut="' + esc(s) + '" ' +
-        'style="--scol:' + color + '">' +
-        '<span class="sf-dot"></span>' + esc(s) + ' <span class="sf-count">(' + groups[s].length + ')</span>' +
-      '</button>';
-    }).join('');
-    filterEl.querySelectorAll('.statut-filter-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        toggleStatut(btn.getAttribute('data-statut'));
-      });
-    });
-  }
-
-  var html = groupOrder.filter(function(s) { return hiddenStatuts.indexOf(s) < 0; }).map(function(statut) {
-    var cards = groups[statut];
-    var color = statutColor(statut);
-    var cardsHtml = cards.map(function(row) { return renderCard(row); }).join('');
-    return '<div class="kanban-col" data-statut="' + esc(statut) + '" ' +
-      'draggable="true" ' +
-      'ondragstart="kanbanColDragStart(event)" ' +
-      'ondragover="kanbanColDragOver(event)" ' +
-      'ondrop="kanbanColDrop(event)" ' +
-      'ondragend="kanbanColDragEnd(event)">' +
-      '<div class="kanban-col-header" style="cursor:grab">' +
-        '<div class="kanban-col-title">' +
-          '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';display:inline-block;flex-shrink:0;margin-right:6px"></span>' +
-          esc(statut) +
-        '</div>' +
-        '<span class="kanban-col-count">' + cards.length + '</span>' +
-      '</div>' +
-      '<div class="kanban-cards">' + cardsHtml + '</div>' +
-    '</div>';
-  }).join('');
-
-  document.getElementById('kanban-view').innerHTML = html || '<div style="color:var(--muted);padding:20px">Aucune donnée</div>';
-  document.getElementById('table-meta').textContent = rows.length + ' articles';
-  // Attacher les événements clic
-  document.querySelectorAll('.montre-card').forEach(function(card) {
-    card.addEventListener('click', function(e) {
-      var propEl = e.target.closest('[data-prop]');
-      if (propEl) {
-        e.stopPropagation();
-        openInlineEdit(card.getAttribute('data-id'), propEl);
-        return;
-      }
-      openModal(card.getAttribute('data-id'));
-    });
-  });
-}
-
-function toggleStatut(statut) {
-  var idx = hiddenStatuts.indexOf(statut);
-  if (idx >= 0) hiddenStatuts.splice(idx, 1);
-  else hiddenStatuts.push(statut);
-  renderKanban();
-}
-
-function renderCard(row) {
-  var nom = getNom(row);
-  var ref = getRef(row);
-  var cover = getCover(row);
-
-  var imgHtml = cover
-    ? '<div class="montre-card-img"><img src="' + cover + '" loading="lazy" style="width:100%;height:130px;object-fit:cover"/></div>'
-    : '<div class="montre-card-img" style="font-size:2rem;display:flex;align-items:center;justify-content:center">&#8987;</div>';
-
-  var propsHtml = SHOW_PROPS.map(function(key) {
-    var val = getPropVal(row, key);
-    if (!val) return '';
-    var propType = state.properties[key] ? state.properties[key].type : null;
-    var editable = ['number','select','checkbox','date','rich_text','title','url','phone_number','email'].includes(propType);
-    return '<div class="montre-prop"' + (editable ? ' data-prop="' + esc(key) + '" data-row="' + row.id + '" title="Cliquer pour modifier" style="cursor:pointer"' : '') + '>' +
-      '<span class="montre-prop-key">' + esc(key) + '</span>' +
-      '<span class="montre-prop-val">' + esc(String(val)) + '</span>' +
-    '</div>';
-  }).filter(Boolean).join('');
-
-  return '<div class="montre-card" data-id="' + row.id + '">' +
-    imgHtml +
-    '<div class="montre-card-body">' +
-      (ref ? '<div class="montre-card-ref">' + esc(ref) + '</div>' : '') +
-      '<div class="montre-card-name">' + esc(nom) + '</div>' +
-      (propsHtml ? '<div class="montre-card-props">' + propsHtml + '</div>' : '') +
-    '</div>' +
-  '</div>';
-}
-
-
-
-// Drag-drop colonnes kanban
-var _kanbanDragStatut = null;
-function kanbanColDragStart(e) {
-  _kanbanDragStatut = e.currentTarget.getAttribute('data-statut');
-  e.currentTarget.style.opacity = '0.5';
-  e.dataTransfer.effectAllowed = 'move';
-}
-function kanbanColDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  e.currentTarget.style.outline = '2px solid var(--teal)';
-}
-function kanbanColDragEnd(e) {
-  e.currentTarget.style.opacity = '';
-  e.currentTarget.style.outline = '';
-  document.querySelectorAll('.kanban-col').forEach(function(c) {
-    c.style.outline = '';
-  });
-}
-function kanbanColDrop(e) {
-  e.preventDefault();
-  var toStatut = e.currentTarget.getAttribute('data-statut');
-  e.currentTarget.style.outline = '';
-  if (!_kanbanDragStatut || _kanbanDragStatut === toStatut) return;
-  
-  var saved = JSON.parse(localStorage.getItem('vp_kanban_order') || 'null') || [
-    'En vente', 'Disponible*', 'Disponible', 'En prépa.', 'Invendue (7-14j)', 'Invendue (+14j)',
-    'Historique de ventes', 'Invendues', 'Rupture', 'Indisponible/Rupture'
-  ];
-  var fromIdx = saved.indexOf(_kanbanDragStatut);
-  var toIdx = saved.indexOf(toStatut);
-  if (fromIdx < 0 || toIdx < 0) return;
-  saved.splice(fromIdx, 1);
-  saved.splice(toIdx, 0, _kanbanDragStatut);
-  localStorage.setItem('vp_kanban_order', JSON.stringify(saved));
-  _kanbanDragStatut = null;
-  renderKanban();
-}
-
-// ═══════════════════════════════════════════
-// ÉDITION INLINE
-// ═══════════════════════════════════════════
-function openInlineEdit(rowId, propEl) {
-  var propName = propEl.getAttribute('data-prop');
-  var row = state.allRows.find(function(r) { return r.id === rowId; });
-  if (!row || !propName) return;
-
-  var propType = state.properties[propName] ? state.properties[propName].type : null;
-  var currentVal = getPropVal(row, propName);
-  var valEl = propEl.querySelector('.montre-prop-val');
-  if (!valEl) return;
-
-  var input;
-  if (propType === 'checkbox') {
-    // Toggle direct pour checkbox
-    var newVal = !currentVal;
-    valEl.textContent = newVal ? 'Oui' : 'Non';
-    saveInlineEdit(rowId, propName, propType, newVal, propEl, row);
-    return;
-  } else if (propType === 'select') {
-    var options = state.properties[propName].select && state.properties[propName].select.options || [];
-    input = document.createElement('select');
-    input.style.cssText = 'font-size:0.78rem;padding:2px 4px;border-radius:4px;border:1px solid var(--teal);background:var(--surface2);color:var(--text);max-width:120px';
-    options.forEach(function(opt) {
-      var o = document.createElement('option');
-      o.value = opt.name;
-      o.textContent = opt.name;
-      if (opt.name === currentVal) o.selected = true;
-      input.appendChild(o);
-    });
-  } else {
-    input = document.createElement('input');
-    input.type = propType === 'date' ? 'date' : propType === 'number' ? 'number' : 'text';
-    input.value = currentVal || '';
-    input.style.cssText = 'font-size:0.78rem;padding:2px 4px;border-radius:4px;border:1px solid var(--teal);background:var(--surface2);color:var(--text);max-width:120px';
-  }
-
-  valEl.innerHTML = '';
-  valEl.appendChild(input);
-  input.focus();
-
-  function save() {
-    saveInlineEdit(rowId, propName, propType, input.value, propEl, row);
-  }
-  input.addEventListener('blur', save);
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); save(); }
-    if (e.key === 'Escape') { valEl.textContent = esc(String(currentVal || '')); }
-  });
-  if (propType === 'select') input.addEventListener('change', save);
-}
-
-async function saveInlineEdit(rowId, propName, propType, newVal, propEl, row) {
-  var valEl = propEl.querySelector('.montre-prop-val');
-  var body = { properties: {} };
-  if (propType === 'number') body.properties[propName] = { number: parseFloat(newVal) || null };
-  else if (propType === 'checkbox') body.properties[propName] = { checkbox: newVal };
-  else if (propType === 'select') body.properties[propName] = { select: newVal ? { name: newVal } : null };
-  else if (propType === 'date') body.properties[propName] = { date: newVal ? { start: newVal } : null };
-  else if (propType === 'url') body.properties[propName] = { url: newVal || null };
-  else if (propType === 'email') body.properties[propName] = { email: newVal || null };
-  else if (propType === 'phone_number') body.properties[propName] = { phone_number: newVal || null };
-  else body.properties[propName] = { rich_text: [{ text: { content: newVal || '' } }] };
-
-  try {
-    await notionFetch('/pages/' + rowId, 'PATCH', null, body);
-    if (valEl) valEl.textContent = newVal || '—';
-    // Mettre à jour le state local
-    var stateRow = state.allRows.find(function(r) { return r.id === rowId; });
-    if (stateRow && stateRow.properties[propName]) {
-      if (propType === 'number') stateRow.properties[propName].number = parseFloat(newVal) || null;
-      else if (propType === 'checkbox') stateRow.properties[propName].checkbox = newVal;
-    }
-  } catch(e) {
-    if (valEl) valEl.textContent = getPropVal(row, propName) || '—';
-    alert('Erreur de sauvegarde : ' + e.message);
-  }
-}
-
-// ═══════════════════════════════════════════
-// MODAL ÉDITION
-// ═══════════════════════════════════════════
-var editingRowId = null;
-
-function openModal(rowId) {
-  editingRowId = rowId;
-  var row = state.allRows.find(function(r) { return r.id === rowId; });
-  if (!row) return;
-
-  var nom = getNom(row);
-  var ref = getRef(row);
-  document.getElementById('modal-ref').textContent = (ref ? ref + ' — ' : '') + nom;
-
-  // Champs éditables
-  var editableTypes = ['rich_text', 'number', 'url', 'select', 'checkbox', 'date'];
-  var fieldsHtml = Object.keys(state.properties).filter(function(k) {
-    return editableTypes.indexOf(state.properties[k].type) >= 0;
-  }).map(function(k) {
-    var type = state.properties[k].type;
-    // Pour les dates, utiliser la valeur ISO brute (pas la valeur formatée)
-    var rawVal = '';
-    var p = row.properties[k];
-    if (type === 'date') {
-      rawVal = (p && p.date && p.date.start) ? p.date.start : '';
-    } else if (type === 'number') {
-      rawVal = (p && p.number !== null && p.number !== undefined) ? String(p.number) : '';
-    } else if (type === 'checkbox') {
-      rawVal = (p && p.checkbox) ? true : false;
-    } else {
-      rawVal = getPropVal(row, k);
-    }
-    var inputHtml = '';
-    if (type === 'checkbox') {
-      inputHtml = '<input type="checkbox" class="modal-input" style="width:auto;height:18px;accent-color:var(--teal)" data-key="' + esc(k) + '" data-type="' + type + '"' + (rawVal ? ' checked' : '') + '>';
-    } else if (type === 'number') {
-      inputHtml = '<input type="number" class="modal-input" data-key="' + esc(k) + '" data-type="' + type + '" value="' + esc(rawVal) + '" placeholder="—">';
-    } else if (type === 'date') {
-      inputHtml = '<input type="date" class="modal-input" data-key="' + esc(k) + '" data-type="' + type + '" value="' + esc(rawVal.substring(0,10)) + '">';
-    } else {
-      inputHtml = '<input type="text" class="modal-input" data-key="' + esc(k) + '" data-type="' + type + '" value="' + esc(rawVal) + '" placeholder="—">';
-    }
-    return '<div class="modal-field"><label>' + esc(k) + '</label>' + inputHtml + '</div>';
-  }).join('');
-
-  document.getElementById('modal-fields').innerHTML = fieldsHtml;
-  document.getElementById('modal-saving').style.display = 'none';
-  document.getElementById('edit-modal').style.display = 'flex';
-}
-
-function closeModal(e) {
-  if (e.target === document.getElementById('edit-modal')) {
-    document.getElementById('edit-modal').style.display = 'none';
-  }
-}
-
-async function saveCard() {
-  if (!editingRowId) return;
-  var saving = document.getElementById('modal-saving');
-  saving.style.display = 'flex';
-
-  var inputs = document.querySelectorAll('#modal-fields .modal-input');
-  var properties = {};
-
-  inputs.forEach(function(input) {
-    var key = input.getAttribute('data-key');
-    var type = input.getAttribute('data-type');
-    var val = input.type === 'checkbox' ? input.checked : input.value;
-    if (type === 'rich_text') properties[key] = { rich_text: [{ type: 'text', text: { content: String(val) } }] };
-    else if (type === 'number') properties[key] = { number: val !== '' ? parseFloat(val) : null };
-    else if (type === 'url') properties[key] = { url: val || null };
-    else if (type === 'checkbox') properties[key] = { checkbox: val };
-    else if (type === 'select') properties[key] = { select: val ? { name: val } : null };
-    else if (type === 'date') properties[key] = { date: val ? { start: val } : null };
-  });
-
-  try {
-    var res = await notionFetch('/pages/' + editingRowId, 'PATCH', currentUser.notionKey, { properties: properties });
-    var idx = state.allRows.findIndex(function(r) { return r.id === editingRowId; });
-    if (idx >= 0 && res.properties) {
-      Object.keys(res.properties).forEach(function(k) {
-        state.allRows[idx].properties[k] = res.properties[k];
-      });
-      state.filteredRows = state.allRows.slice();
-    }
-    document.getElementById('edit-modal').style.display = 'none';
-    if (currentView === 'kanban') renderKanban(); else renderTable();
-  } catch(e) {
-    alert('Erreur lors de la sauvegarde : ' + e.message);
-  }
-  saving.style.display = 'none';
-}
-
-// ─── Init ───────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-  // Récupérer le token OAuth depuis l'URL
-  var urlParams = new URLSearchParams(window.location.search);
-  var oauthToken = urlParams.get('token');
-  if (oauthToken) {
-    localStorage.setItem('notion_oauth_token', oauthToken);
-    window.history.replaceState({}, '', '/');
-    currentUser = { ...USERS['demo@vintedpro.fr'], email: 'demo@vintedpro.fr', notionKey: oauthToken };
-    loadDashboard();
-    return;
-  }
-
-  document.getElementById('login-btn').addEventListener('click', doLogin);
-  document.getElementById('login-password').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') doLogin();
-  });
-});
-</script>
-</body>
-</html>
