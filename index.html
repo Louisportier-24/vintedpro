@@ -1086,7 +1086,7 @@ async function fetchNotionData() {
   state.properties = db.properties;
 
   // 2 — Chargement des entrées — affichage immédiat + chargement en arrière-plan
-  const ACTIVE_STATUTS = ['En vente', 'Disponible', 'Disponible*', 'En prépa.', 'Invendue (7-14j)', 'Invendue (+14j)'];
+  const ACTIVE_STATUTS = ['En vente', 'Invendue (+14j)', 'Disponible*', 'Disponible', 'En prépa.', 'Invendue (7-14j)'];
   
   const sorts = [
     { property: 'Sélection', direction: 'descending' },
@@ -1116,7 +1116,7 @@ async function fetchNotionData() {
     renderKPIs();
   } while (cursor);
 
-  // Chargement du reste en arrière-plan (statuts archivés)
+  // Chargement du reste en arrière-plan (statuts archivés) — sans re-render intermédiaire
   (async function loadArchived() {
     const archivedFilter = {
       or: [
@@ -1127,17 +1127,19 @@ async function fetchNotionData() {
         { property: 'Statut de la montre', select: { is_empty: true } },
       ]
     };
-    let arCursor;
+    let archivedRows = [], arCursor;
     do {
       const body = { page_size: 100, sorts: sorts, filter: archivedFilter };
       if (arCursor) body.start_cursor = arCursor;
       const res = await notionFetch('/databases/' + db.id + '/query', 'POST', key, body);
-      state.allRows = state.allRows.concat(res.results);
-      state.filteredRows = state.allRows.slice();
+      archivedRows = archivedRows.concat(res.results);
       arCursor = res.has_more ? res.next_cursor : null;
-      if (currentView === 'kanban') renderKanban(); else renderTable();
-      renderKPIs();
     } while (arCursor);
+    // Ajouter tout d'un coup à la fin
+    state.allRows = state.allRows.concat(archivedRows);
+    state.filteredRows = state.allRows.slice();
+    if (currentView === 'kanban') renderKanban(); else renderTable();
+    renderKPIs();
   })();
 
   const name = db.title && db.title.length ? db.title.map(function(t) { return t.plain_text; }).join('') : 'Mes données';
