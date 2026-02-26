@@ -1086,7 +1086,16 @@ async function fetchNotionData() {
   state.properties = db.properties;
 
   // 2 — Chargement des entrées — affichage immédiat + chargement en arrière-plan
-  const firstRes = await notionFetch('/databases/' + db.id + '/query', 'POST', key, { page_size: 100 });
+  const sortBody = {
+    page_size: 100,
+    sorts: [
+      { property: 'Sélection', direction: 'descending' },
+      { property: 'Heure de publication', direction: 'ascending' },
+      { property: 'Stock', direction: 'descending' },
+      { property: 'Date de vente', direction: 'ascending' },
+    ]
+  };
+  const firstRes = await notionFetch('/databases/' + db.id + '/query', 'POST', key, sortBody);
   state.allRows = firstRes.results;
   state.filteredRows = firstRes.results.slice();
   state.page = 0;
@@ -1100,7 +1109,7 @@ async function fetchNotionData() {
     let cursor = firstRes.next_cursor;
     (async function loadMore() {
       while (cursor) {
-        const res = await notionFetch('/databases/' + db.id + '/query', 'POST', key, { page_size: 100, start_cursor: cursor });
+        const res = await notionFetch('/databases/' + db.id + '/query', 'POST', key, { ...sortBody, start_cursor: cursor });
         state.allRows = state.allRows.concat(res.results);
         state.filteredRows = state.allRows.slice();
         cursor = res.has_more ? res.next_cursor : null;
