@@ -1097,7 +1097,7 @@ async function fetchNotionData() {
 
   const activeFilter = {
     or: ACTIVE_STATUTS.map(function(s) {
-      return { property: 'Statut de la montre', status: { equals: s } };
+      return { property: 'Statut de la montre', select: { equals: s } };
     })
   };
 
