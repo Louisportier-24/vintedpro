@@ -1108,20 +1108,35 @@ async function fetchNotionData() {
     })
   };
 
+  // Afficher la barre de progression dès le début
+  var progressEl = document.getElementById('loading-progress');
+  var progressBar = document.getElementById('loading-progress-bar');
+  var progressText = document.getElementById('loading-progress-text');
+  function setProgress(pct, label) {
+    if (progressEl) progressEl.style.display = 'flex';
+    if (progressBar) progressBar.style.width = pct + '%';
+    if (progressText) progressText.textContent = label;
+  }
+  setProgress(5, 'Chargement en cours...');
+
   // 1er chargement : statuts actifs uniquement
-  let activeRows = [], cursor;
+  let activeRows = [], cursor, activePage = 0;
   do {
     const body = { page_size: 100, sorts: sorts, filter: activeFilter };
     if (cursor) body.start_cursor = cursor;
     const res = await notionFetch('/databases/' + db.id + '/query', 'POST', key, body);
     activeRows = activeRows.concat(res.results);
     cursor = res.has_more ? res.next_cursor : null;
+    activePage++;
+    var activePct = Math.min(30, Math.round(activePage / 6 * 30));
+    setProgress(activePct, 'Articles actifs : ' + activeRows.length);
     state.allRows = activeRows.slice();
     state.filteredRows = activeRows.slice();
     state.page = 0;
     if (currentView === 'kanban') renderKanban(); else renderTable();
     renderKPIs();
   } while (cursor);
+  setProgress(30, 'Actifs chargés ✓ — Chargement historique...');
 
   // Chargement du reste en arrière-plan (statuts archivés)
   (async function loadArchived() {
@@ -1135,12 +1150,6 @@ async function fetchNotionData() {
       ]
     };
 
-    // Afficher la barre de progression
-    var progressEl = document.getElementById('loading-progress');
-    var progressBar = document.getElementById('loading-progress-bar');
-    var progressText = document.getElementById('loading-progress-text');
-    if (progressEl) progressEl.style.display = 'flex';
-
     let archivedRows = [], arCursor, page = 0;
     do {
       const body = { page_size: 100, sorts: sorts, filter: archivedFilter };
@@ -1149,10 +1158,8 @@ async function fetchNotionData() {
       archivedRows = archivedRows.concat(res.results);
       arCursor = res.has_more ? res.next_cursor : null;
       page++;
-      // Estimation progression (historique ~2900 articles = ~29 pages)
-      var pct = arCursor ? Math.min(95, Math.round(page / 30 * 100)) : 100;
-      if (progressBar) progressBar.style.width = pct + '%';
-      if (progressText) progressText.textContent = pct < 100 ? 'Archivés : ' + pct + '%' : 'Complet ✓';
+      var pct = arCursor ? Math.min(98, 30 + Math.round(page / 30 * 70)) : 100;
+      setProgress(pct, arCursor ? 'Historique : ' + archivedRows.length + ' articles...' : 'Chargement complet ✓');
     } while (arCursor);
 
     // Ajouter tout d'un coup à la fin
@@ -1163,6 +1170,7 @@ async function fetchNotionData() {
 
     // Masquer la barre après 3 secondes
     setTimeout(function() { if (progressEl) progressEl.style.display = 'none'; }, 3000);
+  
   })();
 
   const name = db.title && db.title.length ? db.title.map(function(t) { return t.plain_text; }).join('') : 'Mes données';
