@@ -1735,23 +1735,22 @@ document.addEventListener('DOMContentLoaded', function() {
     return;
   }
 
+  // Enregistrer les event listeners en premier
+  document.getElementById('login-btn').addEventListener('click', doLogin);
+  document.getElementById('login-password').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+
   // Restaurer la session si elle existe
   var savedSession = localStorage.getItem('vp_session');
   if (savedSession) {
     try {
       currentUser = JSON.parse(savedSession);
-      // Attendre que le DOM soit prêt
       setTimeout(function() { loadDashboard(); }, 100);
-      return;
     } catch(e) {
       localStorage.removeItem('vp_session');
     }
   }
-  
-  document.getElementById('login-btn').addEventListener('click', doLogin);
-  document.getElementById('login-password').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') doLogin();
-  });
 });
 </script>
 </body>
