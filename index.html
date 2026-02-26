@@ -1033,6 +1033,14 @@ async function loadDashboard() {
   state.dbId = null;
   state.page = 0;
 
+  // Vider l'affichage
+  var kanbanEl = document.getElementById('kanban-board');
+  var tableEl = document.getElementById('table-body');
+  var kpiEl = document.getElementById('kpi-grid');
+  if (kanbanEl) kanbanEl.innerHTML = '';
+  if (tableEl) tableEl.innerHTML = '';
+  if (kpiEl) kpiEl.innerHTML = '';
+
   // Set user info in sidebar
   const name = currentUser.name || currentUser.email;
   document.getElementById('sb-name').textContent = name;
