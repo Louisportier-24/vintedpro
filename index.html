@@ -1643,10 +1643,10 @@ function toggleSortPanel() {
 
 function getFilterOps(type) {
   if (type === 'number') return ['=', '≠', '<', '>', '≤', '≥'];
-  if (type === 'checkbox') return ['est coché', 'n'est pas coché'];
+  if (type === 'checkbox') return ['est coche', 'non coche'];
   if (type === 'date') return ['avant', 'après', 'est'];
-  if (type === 'select') return ['est', 'n'est pas', 'est vide', 'n'est pas vide'];
-  return ['contient', 'ne contient pas', 'est', 'n'est pas', 'est vide', 'n'est pas vide'];
+  if (type === 'select') return ['est', 'different', 'est vide', 'non vide'];
+  return ['contient', 'ne contient pas', 'est', 'different', 'est vide', 'non vide'];
 }
 
 function renderFilterPanel() {
