@@ -2299,6 +2299,9 @@ function applyFiltersAndSorts() {
   viewSettings.filters.forEach(function(f) {
     if (!f.col) return;
     rows = rows.filter(function(row) {
+      var propType = state.properties[f.col] ? state.properties[f.col].type : 'text';
+      // Pour checkbox : lire la valeur brute depuis les propriétés
+      var rawBool = propType === 'checkbox' ? (row.properties[f.col] && row.properties[f.col].checkbox === true) : null;
       var rawVal = getPropVal(row, f.col);
       var val = String(rawVal || '').toLowerCase();
       var fval = String(f.val || '').toLowerCase();
@@ -2308,8 +2311,8 @@ function applyFiltersAndSorts() {
       if (f.op === 'different') return val !== fval;
       if (f.op === 'vide') return !rawVal && rawVal !== 0 && rawVal !== false;
       if (f.op === 'non_vide') return rawVal !== null && rawVal !== undefined && rawVal !== '';
-      if (f.op === 'coche') return rawVal === true;
-      if (f.op === 'non_coche') return rawVal !== true;
+      if (f.op === 'coche') return rawBool === true;
+      if (f.op === 'non_coche') return rawBool !== true;
       if (f.op === 'inferieur') return parseFloat(val) < parseFloat(fval);
       if (f.op === 'superieur') return parseFloat(val) > parseFloat(fval);
       if (f.op === 'avant') return new Date(val) < new Date(fval);
