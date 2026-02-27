@@ -1638,6 +1638,173 @@ function renderCard(row) {
   '</div>';
 }
 
+// ═══════════════════════════════════════════
+// ÉDITION INLINE
+// ═══════════════════════════════════════════
+function openInlineEdit(rowId, propEl) {
+  var propName = propEl.getAttribute('data-prop');
+  var row = state.allRows.find(function(r) { return r.id === rowId; });
+  if (!row || !propName) return;
+
+  var propType = state.properties[propName] ? state.properties[propName].type : null;
+  var currentVal = getPropVal(row, propName);
+  var valEl = propEl.querySelector('.montre-prop-val');
+  if (!valEl) return;
+
+  var input;
+  if (propType === 'checkbox') {
+    var newVal = !currentVal;
+    valEl.textContent = newVal ? 'Oui' : 'Non';
+    saveInlineEdit(rowId, propName, propType, newVal, propEl, row);
+    return;
+  } else if (propType === 'select') {
+    var options = state.properties[propName].select && state.properties[propName].select.options || [];
+    input = document.createElement('select');
+    input.style.cssText = 'font-size:0.78rem;padding:2px 4px;border-radius:4px;border:1px solid var(--teal);background:var(--surface2);color:var(--text);max-width:120px';
+    options.forEach(function(opt) {
+      var o = document.createElement('option');
+      o.value = opt.name; o.textContent = opt.name;
+      if (opt.name === currentVal) o.selected = true;
+      input.appendChild(o);
+    });
+  } else {
+    input = document.createElement('input');
+    input.type = propType === 'date' ? 'date' : propType === 'number' ? 'number' : 'text';
+    input.value = currentVal || '';
+    input.style.cssText = 'font-size:0.78rem;padding:2px 4px;border-radius:4px;border:1px solid var(--teal);background:var(--surface2);color:var(--text);max-width:120px';
+  }
+
+  valEl.innerHTML = '';
+  valEl.appendChild(input);
+  input.focus();
+
+  function save() { saveInlineEdit(rowId, propName, propType, input.value, propEl, row); }
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { valEl.textContent = String(currentVal || ''); }
+  });
+  if (propType === 'select') input.addEventListener('change', save);
+}
+
+async function saveInlineEdit(rowId, propName, propType, newVal, propEl, row) {
+  var valEl = propEl.querySelector('.montre-prop-val');
+  var body = { properties: {} };
+  if (propType === 'number') body.properties[propName] = { number: parseFloat(newVal) || null };
+  else if (propType === 'checkbox') body.properties[propName] = { checkbox: newVal };
+  else if (propType === 'select') body.properties[propName] = { select: newVal ? { name: newVal } : null };
+  else if (propType === 'date') body.properties[propName] = { date: newVal ? { start: newVal } : null };
+  else if (propType === 'url') body.properties[propName] = { url: newVal || null };
+  else if (propType === 'email') body.properties[propName] = { email: newVal || null };
+  else body.properties[propName] = { rich_text: [{ text: { content: newVal || '' } }] };
+
+  try {
+    await notionFetch('/pages/' + rowId, 'PATCH', null, body);
+    if (valEl) valEl.textContent = newVal || '—';
+  } catch(e) {
+    if (valEl) valEl.textContent = String(getPropVal(row, propName) || '');
+    alert('Erreur : ' + e.message);
+  }
+}
+
+// ═══════════════════════════════════════════
+// MODAL ÉDITION
+// ═══════════════════════════════════════════
+var editingRowId = null;
+
+function openModal(rowId) {
+  editingRowId = rowId;
+  var row = state.allRows.find(function(r) { return r.id === rowId; });
+  if (!row) return;
+
+  var nom = getNom(row);
+  var ref = getRef(row);
+  document.getElementById('modal-ref').textContent = (ref ? ref + ' — ' : '') + nom;
+
+  var fields = document.getElementById('modal-fields');
+  fields.innerHTML = '';
+
+  var editableTypes = ['number', 'select', 'checkbox', 'date', 'rich_text', 'url', 'email', 'phone_number'];
+  Object.keys(state.properties).forEach(function(key) {
+    var prop = state.properties[key];
+    if (!editableTypes.includes(prop.type)) return;
+    var val = getPropVal(row, key);
+
+    var div = document.createElement('div');
+    div.className = 'modal-field';
+
+    var label = document.createElement('label');
+    label.textContent = key;
+    div.appendChild(label);
+
+    var input;
+    if (prop.type === 'select') {
+      input = document.createElement('select');
+      input.className = 'modal-input';
+      var emptyOpt = document.createElement('option');
+      emptyOpt.value = ''; emptyOpt.textContent = '—';
+      input.appendChild(emptyOpt);
+      (prop.select.options || []).forEach(function(o) {
+        var opt = document.createElement('option');
+        opt.value = o.name; opt.textContent = o.name;
+        if (o.name === val) opt.selected = true;
+        input.appendChild(opt);
+      });
+    } else if (prop.type === 'checkbox') {
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = row.properties[key] && row.properties[key].checkbox;
+    } else {
+      input = document.createElement('input');
+      input.className = 'modal-input';
+      input.type = prop.type === 'number' ? 'number' : prop.type === 'date' ? 'date' : 'text';
+      input.value = val || '';
+    }
+    input.setAttribute('data-prop', key);
+    input.setAttribute('data-type', prop.type);
+    div.appendChild(input);
+    fields.appendChild(div);
+  });
+
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('edit-modal')) {
+    document.getElementById('edit-modal').style.display = 'none';
+  }
+}
+
+async function saveCard() {
+  var row = state.allRows.find(function(r) { return r.id === editingRowId; });
+  if (!row) return;
+
+  var saving = document.getElementById('modal-saving');
+  saving.style.display = 'flex';
+
+  var body = { properties: {} };
+  document.querySelectorAll('#modal-fields [data-prop]').forEach(function(input) {
+    var key = input.getAttribute('data-prop');
+    var type = input.getAttribute('data-type');
+    if (type === 'number') body.properties[key] = { number: parseFloat(input.value) || null };
+    else if (type === 'checkbox') body.properties[key] = { checkbox: input.checked };
+    else if (type === 'select') body.properties[key] = { select: input.value ? { name: input.value } : null };
+    else if (type === 'date') body.properties[key] = { date: input.value ? { start: input.value } : null };
+    else if (type === 'url') body.properties[key] = { url: input.value || null };
+    else if (type === 'email') body.properties[key] = { email: input.value || null };
+    else body.properties[key] = { rich_text: [{ text: { content: input.value || '' } }] };
+  });
+
+  try {
+    await notionFetch('/pages/' + editingRowId, 'PATCH', null, body);
+    document.getElementById('edit-modal').style.display = 'none';
+    saving.style.display = 'none';
+  } catch(e) {
+    saving.style.display = 'none';
+    alert('Erreur : ' + e.message);
+  }
+}
+
 // Drag-drop colonnes kanban
 var _kanbanDragStatut = null;
 function kanbanColDragStart(e) {
