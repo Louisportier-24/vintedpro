@@ -1570,7 +1570,7 @@ function renderKanban() {
   var rows = state.filteredRows;
 
   var DEFAULT_STATUTS = [
-    'En vente', 'Disponible*', 'Disponible', 'En prépa.', 'Invendue (7-14j)', 'Invendue (+14j)',
+    'Disponible', 'Disponible*', 'En prépa.', 'En vente', 'Invendue (7-14j)', 'Invendue (+14j)',
     'Historique de ventes', 'Invendues', 'Rupture', 'Indisponible/Rupture'
   ];
   var savedKanbanOrder = JSON.parse(localStorage.getItem('vp_kanban_order') || 'null');
@@ -1869,14 +1869,13 @@ function renderGallery() {
 
   // Grouper par statut (mêmes groupes actifs que kanban)
   var savedKanbanOrder = JSON.parse(localStorage.getItem('vp_kanban_order') || 'null');
-  var DEFAULT_STATUTS = [
-    'En vente', 'Disponible*', 'Disponible', 'En prépa.', 'Invendue (7-14j)', 'Invendue (+14j)',
-    'Historique de ventes', 'Invendues', 'Rupture', 'Indisponible/Rupture'
+  var GALLERY_STATUTS = [
+    'Disponible', 'Disponible*', 'En prépa.', 'En vente', 'Invendue (7-14j)', 'Invendue (+14j)', 'Rupture'
   ];
-  var ALL_KNOWN_STATUTS = savedKanbanOrder || DEFAULT_STATUTS;
+  var ALL_KNOWN_STATUTS = savedKanbanOrder || GALLERY_STATUTS;
 
   var groups = {};
-  ALL_KNOWN_STATUTS.forEach(function(s) { groups[s] = []; });
+  GALLERY_STATUTS.forEach(function(s) { groups[s] = []; });
   rows.forEach(function(row) {
     var s = getStatut(row);
     if (!groups[s]) groups[s] = [];
@@ -1885,8 +1884,8 @@ function renderGallery() {
 
   container.innerHTML = '';
 
-  ALL_KNOWN_STATUTS.filter(function(s) {
-    return hiddenStatuts.indexOf(s) < 0 && groups[s] && groups[s].length > 0;
+  GALLERY_STATUTS.filter(function(s) {
+    return groups[s] && groups[s].length > 0;
   }).forEach(function(statut) {
     var cards = groups[statut];
     var color = statutColor(statut);
@@ -1964,7 +1963,7 @@ function kanbanColDrop(e) {
   e.currentTarget.style.outline = '';
   if (!_kanbanDragStatut || _kanbanDragStatut === toStatut) return;
   var saved = JSON.parse(localStorage.getItem('vp_kanban_order') || 'null') || [
-    'En vente', 'Disponible*', 'Disponible', 'En prépa.', 'Invendue (7-14j)', 'Invendue (+14j)',
+    'Disponible', 'Disponible*', 'En prépa.', 'En vente', 'Invendue (7-14j)', 'Invendue (+14j)',
     'Historique de ventes', 'Invendues', 'Rupture', 'Indisponible/Rupture'
   ];
   var fromIdx = saved.indexOf(_kanbanDragStatut);
@@ -2055,7 +2054,7 @@ function getPropVal(row, key) {
 var SHOW_PROPS = ['Référence', 'Prix', 'Heure de publication', 'Date de vente', 'Boost', 'Shop', 'Couleur', 'Nb favoris', 'Nb offres', 'Score HOT', 'Efficience', 'Top ->', 'Stock Palier', 'Taux de vente', 'Ventes du mois'];
 
 // Statuts masqués par défaut
-var HIDDEN_STATUTS = ['Historique de ventes', 'Invendues', 'Rupture', 'Indisponible/Rupture', 'Invendue (7-14j)', 'Invendue (+14j)'];
+var HIDDEN_STATUTS = ['Historique de ventes', 'Invendues', 'Rupture', 'Indisponible/Rupture'];
 var hiddenStatuts = HIDDEN_STATUTS.slice(); // copie modifiable
 
 
