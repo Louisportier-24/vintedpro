@@ -1647,14 +1647,17 @@ function openInlineEdit(rowId, propEl) {
   if (!row || !propName) return;
 
   var propType = state.properties[propName] ? state.properties[propName].type : null;
-  var currentVal = getPropVal(row, propName);
+  // Valeur brute (non formatée) pour l'input
+  var rawProp = row.properties[propName];
+  var currentRaw = propType === 'number' ? (rawProp && rawProp.number !== null ? rawProp.number : '') : getPropVal(row, propName);
+  var currentDisplay = getPropVal(row, propName); // valeur affichée pour restauration
   var valEl = propEl.querySelector('.montre-prop-val');
   if (!valEl) return;
 
   var input;
   if (propType === 'checkbox') {
-    var newVal = !currentVal;
-    valEl.textContent = newVal ? 'Oui' : 'Non';
+    var newVal = !(rawProp && rawProp.checkbox);
+    valEl.textContent = newVal ? '✔' : '';
     saveInlineEdit(rowId, propName, propType, newVal, propEl, row);
     return;
   } else if (propType === 'select') {
@@ -1664,30 +1667,36 @@ function openInlineEdit(rowId, propEl) {
     options.forEach(function(opt) {
       var o = document.createElement('option');
       o.value = opt.name; o.textContent = opt.name;
-      if (opt.name === currentVal) o.selected = true;
+      if (opt.name === currentDisplay) o.selected = true;
       input.appendChild(o);
     });
   } else {
     input = document.createElement('input');
     input.type = propType === 'date' ? 'date' : propType === 'number' ? 'number' : 'text';
-    input.value = currentVal || '';
+    input.value = currentRaw !== '' ? currentRaw : '';
     input.style.cssText = 'font-size:0.78rem;padding:2px 4px;border-radius:4px;border:1px solid var(--teal);background:var(--surface2);color:var(--text);max-width:120px';
   }
 
   valEl.innerHTML = '';
   valEl.appendChild(input);
   input.focus();
+  if (input.select) input.select();
 
-  function save() { saveInlineEdit(rowId, propName, propType, input.value, propEl, row); }
+  var saved = false;
+  function save() {
+    if (saved) return;
+    saved = true;
+    saveInlineEdit(rowId, propName, propType, input.value, propEl, row, currentDisplay);
+  }
   input.addEventListener('blur', save);
   input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); save(); }
-    if (e.key === 'Escape') { valEl.textContent = String(currentVal || ''); }
+    if (e.key === 'Escape') { saved = true; valEl.textContent = String(currentDisplay || ''); }
   });
   if (propType === 'select') input.addEventListener('change', save);
 }
 
-async function saveInlineEdit(rowId, propName, propType, newVal, propEl, row) {
+async function saveInlineEdit(rowId, propName, propType, newVal, propEl, row, currentDisplay) {
   var valEl = propEl.querySelector('.montre-prop-val');
   var body = { properties: {} };
   if (propType === 'number') body.properties[propName] = { number: parseFloat(newVal) || null };
@@ -1702,7 +1711,7 @@ async function saveInlineEdit(rowId, propName, propType, newVal, propEl, row) {
     await notionFetch('/pages/' + rowId, 'PATCH', null, body);
     if (valEl) valEl.textContent = newVal || '—';
   } catch(e) {
-    if (valEl) valEl.textContent = String(getPropVal(row, propName) || '');
+    if (valEl) valEl.textContent = String(currentDisplay || getPropVal(row, propName) || '');
     alert('Erreur : ' + e.message);
   }
 }
