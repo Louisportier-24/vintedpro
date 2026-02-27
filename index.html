@@ -2333,7 +2333,7 @@ function applyFiltersAndSorts() {
 
   state.filteredRows = rows;
   state.page = 0;
-  if (currentView === 'kanban') renderKanban(); else renderTable();
+  if (currentView === 'kanban') renderKanban(); else if (currentView === 'gallery') renderGallery(); else renderTable();
   renderKPIs();
 }
 
