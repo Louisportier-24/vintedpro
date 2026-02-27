@@ -490,6 +490,40 @@ textarea.form-input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .empty-title { font-family: 'Syne', sans-serif; font-size: 0.95rem; color: var(--muted2); margin-bottom: 5px; }
 .empty-sub { font-size: 0.76rem; color: var(--muted); }
 
+/* Gallery view */
+.gallery-group { margin-bottom: 20px; }
+.gallery-group-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0 10px; cursor: pointer; user-select: none;
+  font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.82rem;
+  border-bottom: 1px solid var(--border); margin-bottom: 12px;
+}
+.gallery-group-arrow { font-size: 0.65rem; color: var(--muted); transition: transform 0.2s; display: inline-block; }
+.gallery-group-arrow.open { transform: rotate(90deg); }
+.gallery-group-count { font-size: 0.7rem; color: var(--muted2); background: var(--surface2); padding: 1px 8px; border-radius: 99px; }
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.gallery-grid.collapsed { display: none; }
+.gallery-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden; cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.gallery-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+.gallery-card-img {
+  width: 100%; height: 150px; background: var(--surface3);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 2rem; overflow: hidden;
+}
+.gallery-card-img img { width: 100%; height: 150px; object-fit: cover; display: block; }
+.gallery-card-body { padding: 10px 12px; }
+.gallery-card-name { font-weight: 600; font-size: 0.8rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+.gallery-card-ref { font-size: 0.68rem; color: var(--muted); margin-bottom: 4px; }
+.gallery-card-tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.68rem; font-weight: 600; margin-top: 4px; }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -861,6 +895,7 @@ textarea.form-input { resize: vertical; min-height: 80px; line-height: 1.5; }
           <div class="view-toggle">
             <button class="view-btn active" id="btn-kanban" onclick="setView('kanban')">⊞ Kanban</button>
             <button class="view-btn" id="btn-table" onclick="setView('table')">≡ Tableau</button>
+            <button class="view-btn" id="btn-gallery" onclick="setView('gallery')">⊟ Liste à publier</button>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
             <button class="view-btn" id="btn-filter" onclick="toggleFilterPanel()" style="display:flex;align-items:center;gap:4px;">
@@ -890,6 +925,8 @@ textarea.form-input { resize: vertical; min-height: 80px; line-height: 1.5; }
       </div>
       <!-- Kanban view -->
       <div id="kanban-view" class="kanban-wrap"></div>
+      <!-- Gallery view -->
+      <div id="gallery-view" style="display:none;"></div>
       <!-- Table view -->
       <div id="table-view" style="display:none;">
         <div class="table-wrap">
@@ -1820,6 +1857,90 @@ async function saveCard() {
   }
 }
 
+// ═══════════════════════════════════════════
+// VUE GALERIE
+// ═══════════════════════════════════════════
+var collapsedGroups = {};
+
+function renderGallery() {
+  var rows = state.filteredRows;
+  var container = document.getElementById('gallery-view');
+  if (!container) return;
+
+  // Grouper par statut (mêmes groupes actifs que kanban)
+  var savedKanbanOrder = JSON.parse(localStorage.getItem('vp_kanban_order') || 'null');
+  var DEFAULT_STATUTS = [
+    'En vente', 'Disponible*', 'Disponible', 'En prépa.', 'Invendue (7-14j)', 'Invendue (+14j)',
+    'Historique de ventes', 'Invendues', 'Rupture', 'Indisponible/Rupture'
+  ];
+  var ALL_KNOWN_STATUTS = savedKanbanOrder || DEFAULT_STATUTS;
+
+  var groups = {};
+  ALL_KNOWN_STATUTS.forEach(function(s) { groups[s] = []; });
+  rows.forEach(function(row) {
+    var s = getStatut(row);
+    if (!groups[s]) groups[s] = [];
+    groups[s].push(row);
+  });
+
+  container.innerHTML = '';
+
+  ALL_KNOWN_STATUTS.filter(function(s) {
+    return hiddenStatuts.indexOf(s) < 0 && groups[s] && groups[s].length > 0;
+  }).forEach(function(statut) {
+    var cards = groups[statut];
+    var color = statutColor(statut);
+    var isCollapsed = collapsedGroups[statut];
+
+    var group = document.createElement('div');
+    group.className = 'gallery-group';
+
+    var header = document.createElement('div');
+    header.className = 'gallery-group-header';
+    header.innerHTML =
+      '<span class="gallery-group-arrow' + (isCollapsed ? '' : ' open') + '">▶</span>' +
+      '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';display:inline-block;flex-shrink:0"></span>' +
+      '<span>' + esc(statut) + '</span>' +
+      '<span class="gallery-group-count">' + cards.length + '</span>';
+
+    header.addEventListener('click', function() {
+      collapsedGroups[statut] = !collapsedGroups[statut];
+      renderGallery();
+    });
+
+    var grid = document.createElement('div');
+    grid.className = 'gallery-grid' + (isCollapsed ? ' collapsed' : '');
+
+    cards.forEach(function(row) {
+      var card = document.createElement('div');
+      card.className = 'gallery-card';
+      card.setAttribute('data-id', row.id);
+
+      var cover = getCover(row);
+      var nom = getNom(row);
+      var ref = getRef(row);
+
+      card.innerHTML =
+        '<div class="gallery-card-img">' +
+          (cover ? '<img src="' + cover + '" loading="lazy"/>' : '⌚') +
+        '</div>' +
+        '<div class="gallery-card-body">' +
+          (ref ? '<div class="gallery-card-ref">' + esc(ref) + '</div>' : '') +
+          '<div class="gallery-card-name">' + esc(nom) + '</div>' +
+        '</div>';
+
+      card.addEventListener('click', function() { openModal(row.id); });
+      grid.appendChild(card);
+    });
+
+    group.appendChild(header);
+    group.appendChild(grid);
+    container.appendChild(group);
+  });
+
+  document.getElementById('table-meta').textContent = rows.length + ' articles';
+}
+
 // Drag-drop colonnes kanban
 var _kanbanDragStatut = null;
 function kanbanColDragStart(e) {
@@ -1859,7 +1980,6 @@ function kanbanColDrop(e) {
 
 function setView(v) {
   currentView = v;
-  // Fermer les panels et charger les settings de la nouvelle vue
   document.getElementById('filter-panel').style.display = 'none';
   document.getElementById('sort-panel').style.display = 'none';
   viewSettings = loadViewSettings();
@@ -1867,9 +1987,12 @@ function setView(v) {
   renderSortPanel();
   document.getElementById('btn-kanban').classList.toggle('active', v === 'kanban');
   document.getElementById('btn-table').classList.toggle('active', v === 'table');
+  document.getElementById('btn-gallery').classList.toggle('active', v === 'gallery');
   document.getElementById('kanban-view').style.display = v === 'kanban' ? 'flex' : 'none';
   document.getElementById('table-view').style.display  = v === 'table'  ? 'block' : 'none';
+  document.getElementById('gallery-view').style.display = v === 'gallery' ? 'block' : 'none';
   if (v === 'kanban') renderKanban();
+  else if (v === 'gallery') renderGallery();
   else renderTable();
 }
 
