@@ -1189,6 +1189,9 @@ async function fetchNotionData() {
   }
   setProgress(5, 'Chargement en cours...');
 
+  // Charger les settings de la vue courante AVANT de commencer le chargement
+  viewSettings = loadViewSettings();
+
   // 1er chargement : statuts actifs uniquement
   let activeRows = [], cursor, activePage = 0;
   do {
@@ -1229,12 +1232,14 @@ async function fetchNotionData() {
       page++;
       var pct = arCursor ? Math.min(98, 30 + Math.round(page / 30 * 70)) : 100;
       setProgress(pct, arCursor ? 'Historique : ' + archivedRows.length + ' articles...' : 'Chargement complet ✓');
+      // Rendu progressif aussi pour les archives
+      state.allRows = state.allRows.filter(function(r) {
+        return archivedRows.indexOf(r) < 0;
+      });
+      // Reconstruire allRows = actifs + archives chargés jusqu'ici
+      state.allRows = activeRows.concat(archivedRows);
+      applyFiltersAndSorts();
     } while (arCursor);
-
-    // Ajouter tout d'un coup à la fin
-    state.allRows = state.allRows.concat(archivedRows);
-    applyFiltersAndSorts();
-    renderKPIs();
 
     // Masquer la barre après 3 secondes
     setTimeout(function() { if (progressEl) progressEl.style.display = 'none'; }, 3000);
