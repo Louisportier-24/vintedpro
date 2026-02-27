@@ -1649,7 +1649,8 @@ function openInlineEdit(rowId, propEl) {
   var propType = state.properties[propName] ? state.properties[propName].type : null;
   // Valeur brute (non formatée) pour l'input
   var rawProp = row.properties[propName];
-  var currentRaw = propType === 'number' ? (rawProp && rawProp.number !== null ? rawProp.number : '') : getPropVal(row, propName);
+  // Pour les nombres : utiliser la valeur brute sans formatage (fmtNum ajoute des espaces incompatibles avec input[type=number])
+  var currentRaw = propType === 'number' ? (rawProp && rawProp.number !== null && rawProp.number !== undefined ? rawProp.number : '') : getPropVal(row, propName);
   var currentDisplay = getPropVal(row, propName); // valeur affichée pour restauration
   var valEl = propEl.querySelector('.montre-prop-val');
   if (!valEl) return;
@@ -1673,7 +1674,7 @@ function openInlineEdit(rowId, propEl) {
   } else {
     input = document.createElement('input');
     input.type = propType === 'date' ? 'date' : propType === 'number' ? 'number' : 'text';
-    input.value = currentRaw !== '' ? currentRaw : '';
+    input.value = currentRaw !== '' ? String(currentRaw).replace(/\s/g, '').replace(',', '.') : '';
     input.style.cssText = 'font-size:0.78rem;padding:2px 4px;border-radius:4px;border:1px solid var(--teal);background:var(--surface2);color:var(--text);max-width:120px';
   }
 
