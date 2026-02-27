@@ -1642,7 +1642,9 @@ function toggleStatut(statut) {
   var idx = hiddenStatuts.indexOf(statut);
   if (idx >= 0) hiddenStatuts.splice(idx, 1);
   else hiddenStatuts.push(statut);
-  renderKanban();
+  if (currentView === 'kanban') renderKanban();
+  else if (currentView === 'gallery') renderGallery();
+  else renderTable();
 }
 
 function renderCard(row) {
