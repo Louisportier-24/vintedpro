@@ -1236,8 +1236,8 @@ async function fetchNotionData() {
 
     // Ajouter tout d'un coup à la fin
     state.allRows = state.allRows.concat(archivedRows);
-    state.filteredRows = state.allRows.slice();
-    if (currentView === 'kanban') renderKanban(); else renderTable();
+    // Réappliquer les filtres actifs au lieu d'écraser filteredRows
+    applyFiltersAndSorts();
     renderKPIs();
 
     // Masquer la barre après 3 secondes
