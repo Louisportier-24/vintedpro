@@ -1638,6 +1638,43 @@ function renderCard(row) {
   '</div>';
 }
 
+// Drag-drop colonnes kanban
+var _kanbanDragStatut = null;
+function kanbanColDragStart(e) {
+  _kanbanDragStatut = e.currentTarget.getAttribute('data-statut');
+  e.currentTarget.style.opacity = '0.5';
+  e.dataTransfer.effectAllowed = 'move';
+}
+function kanbanColDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.style.outline = '2px solid var(--teal)';
+}
+function kanbanColDragEnd(e) {
+  e.currentTarget.style.opacity = '';
+  e.currentTarget.style.outline = '';
+  document.querySelectorAll('.kanban-col').forEach(function(c) { c.style.outline = ''; });
+}
+function kanbanColDrop(e) {
+  e.preventDefault();
+  var toStatut = e.currentTarget.getAttribute('data-statut');
+  e.currentTarget.style.outline = '';
+  if (!_kanbanDragStatut || _kanbanDragStatut === toStatut) return;
+  var saved = JSON.parse(localStorage.getItem('vp_kanban_order') || 'null') || [
+    'En vente', 'Disponible*', 'Disponible', 'En prépa.', 'Invendue (7-14j)', 'Invendue (+14j)',
+    'Historique de ventes', 'Invendues', 'Rupture', 'Indisponible/Rupture'
+  ];
+  var fromIdx = saved.indexOf(_kanbanDragStatut);
+  var toIdx = saved.indexOf(toStatut);
+  if (fromIdx < 0) { saved.push(_kanbanDragStatut); fromIdx = saved.length - 1; }
+  if (toIdx < 0) { saved.push(toStatut); toIdx = saved.length - 1; }
+  saved.splice(fromIdx, 1);
+  saved.splice(toIdx, 0, _kanbanDragStatut);
+  localStorage.setItem('vp_kanban_order', JSON.stringify(saved));
+  _kanbanDragStatut = null;
+  renderKanban();
+}
+
 function setView(v) {
   currentView = v;
   // Fermer les panels et charger les settings de la nouvelle vue
