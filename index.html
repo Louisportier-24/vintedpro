@@ -1884,6 +1884,23 @@ function renderGallery() {
     groups[s].push(row);
   });
 
+  // Mettre à jour le menu latéral des statuts
+  var filterEl = document.getElementById('statut-filter-bar');
+  if (filterEl) {
+    filterEl.innerHTML = '';
+    GALLERY_STATUTS.forEach(function(s) {
+      var hidden = hiddenStatuts.indexOf(s) >= 0;
+      var color = statutColor(s);
+      var btn = document.createElement('button');
+      btn.className = 'statut-filter-btn' + (hidden ? '' : ' active');
+      btn.setAttribute('data-statut', s);
+      btn.style.setProperty('--scol', color);
+      btn.innerHTML = '<span class="sf-dot"></span>' + esc(s) + ' <span class="sf-count">(' + (groups[s] ? groups[s].length : 0) + ')</span>';
+      btn.addEventListener('click', function() { toggleStatut(s); });
+      filterEl.appendChild(btn);
+    });
+  }
+
   container.innerHTML = '';
 
   GALLERY_STATUTS.filter(function(s) {
