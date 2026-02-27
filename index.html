@@ -1202,10 +1202,7 @@ async function fetchNotionData() {
     var activePct = Math.min(30, Math.round(activePage / 6 * 30));
     setProgress(activePct, 'Articles actifs : ' + activeRows.length);
     state.allRows = activeRows.slice();
-    state.filteredRows = activeRows.slice();
-    state.page = 0;
-    if (currentView === 'kanban') renderKanban(); else renderTable();
-    renderKPIs();
+    applyFiltersAndSorts();
   } while (cursor);
   setProgress(30, 'Actifs chargés ✓ — Chargement historique...');
 
@@ -1236,7 +1233,6 @@ async function fetchNotionData() {
 
     // Ajouter tout d'un coup à la fin
     state.allRows = state.allRows.concat(archivedRows);
-    // Réappliquer les filtres actifs au lieu d'écraser filteredRows
     applyFiltersAndSorts();
     renderKPIs();
 
