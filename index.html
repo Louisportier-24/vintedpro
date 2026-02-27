@@ -2005,9 +2005,7 @@ function setView(v) {
   document.getElementById('kanban-view').style.display = v === 'kanban' ? 'flex' : 'none';
   document.getElementById('table-view').style.display  = v === 'table'  ? 'block' : 'none';
   document.getElementById('gallery-view').style.display = v === 'gallery' ? 'block' : 'none';
-  if (v === 'kanban') renderKanban();
-  else if (v === 'gallery') renderGallery();
-  else renderTable();
+  applyFiltersAndSorts(); // applique les filtres propres à cette vue
 }
 
 function getStatut(row) {
