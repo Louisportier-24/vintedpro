@@ -1650,7 +1650,8 @@ function openInlineEdit(rowId, propEl) {
   // Valeur brute (non formatée) pour l'input
   var rawProp = row.properties[propName];
   // Pour les nombres : utiliser la valeur brute sans formatage (fmtNum ajoute des espaces incompatibles avec input[type=number])
-  var currentRaw = propType === 'number' ? (rawProp && rawProp.number !== null && rawProp.number !== undefined ? rawProp.number : '') : getPropVal(row, propName);
+  var isPercent = propType === 'number' && state.properties[propName] && state.properties[propName].number && state.properties[propName].number.format === 'percent';
+  var currentRaw = propType === 'number' ? (rawProp && rawProp.number !== null && rawProp.number !== undefined ? (isPercent ? Math.round(rawProp.number * 10000) / 100 : rawProp.number) : '') : getPropVal(row, propName);
   var currentDisplay = getPropVal(row, propName); // valeur affichée pour restauration
   var valEl = propEl.querySelector('.montre-prop-val');
   if (!valEl) return;
@@ -1700,7 +1701,11 @@ function openInlineEdit(rowId, propEl) {
 async function saveInlineEdit(rowId, propName, propType, newVal, propEl, row, currentDisplay) {
   var valEl = propEl.querySelector('.montre-prop-val');
   var body = { properties: {} };
-  if (propType === 'number') body.properties[propName] = { number: parseFloat(newVal) || null };
+  if (propType === 'number') {
+    var saveNum = parseFloat(newVal);
+    var isPct = state.properties[propName] && state.properties[propName].number && state.properties[propName].number.format === 'percent';
+    body.properties[propName] = { number: isNaN(saveNum) ? null : (isPct ? saveNum / 100 : saveNum) };
+  }
   else if (propType === 'checkbox') body.properties[propName] = { checkbox: newVal };
   else if (propType === 'select') body.properties[propName] = { select: newVal ? { name: newVal } : null };
   else if (propType === 'date') body.properties[propName] = { date: newVal ? { start: newVal } : null };
@@ -1899,7 +1904,12 @@ function getPropVal(row, key) {
   var p = row.properties[key];
   if (!p) return '';
   var type = p.type || (state.properties[key] && state.properties[key].type) || '';
-  if (type === 'number') return p.number !== null && p.number !== undefined ? fmtNum(p.number) : '';
+  if (type === 'number') {
+    if (p.number === null || p.number === undefined) return '';
+    var numProp = state.properties[key];
+    if (numProp && numProp.number && numProp.number.format === 'percent') return fmtNum(Math.round(p.number * 10000) / 100) + '%';
+    return fmtNum(p.number);
+  }
   if (type === 'rich_text') return p.rich_text && p.rich_text.length ? p.rich_text.map(function(t){return t.plain_text;}).join('') : '';
   if (type === 'select') return p.select ? p.select.name : '';
   if (type === 'multi_select') return p.multi_select ? p.multi_select.map(function(o){return o.name;}).join(', ') : '';
